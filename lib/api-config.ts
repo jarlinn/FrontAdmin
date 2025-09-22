@@ -20,6 +20,9 @@ export const API_CONFIG = {
   // Configuración de timeout (en milisegundos)
   TIMEOUT: 30000,
   
+  // Timeout extendido para operaciones que requieren regeneración de IA (en milisegundos)
+  EXTENDED_TIMEOUT: 60000, // 60 segundos para regeneración de respuestas
+  
   // Headers por defecto
   DEFAULT_HEADERS: {
     'Accept': 'application/json',
