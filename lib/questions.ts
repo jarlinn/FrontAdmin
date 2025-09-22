@@ -137,7 +137,8 @@ class QuestionService {
           method: 'PATCH',
           body: formData,
           // No agregar Content-Type para FormData, el browser lo maneja automáticamente
-        }
+        },
+        API_CONFIG.EXTENDED_TIMEOUT // Usar timeout extendido para regeneración
       )
 
       if (!response.ok) {

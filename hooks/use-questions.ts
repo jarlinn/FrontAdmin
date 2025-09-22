@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Question, QuestionFilters, UpdateQuestionRequest, questionService, PaginationInfo } from '@/lib/questions'
 
+// Cache global para preguntas
+interface QuestionsCache {
+  items: Question[]
+  pagination: PaginationInfo
+  filters: QuestionFilters
+  timestamp: number
+}
+
+let questionsCache: QuestionsCache | null = null
+const CACHE_DURATION = 2 * 60 * 1000 // 2 minutos en milisegundos (más corto para datos dinámicos)
+
 interface UseQuestionsReturn {
   questions: Question[]
   pagination: PaginationInfo | null
@@ -25,12 +36,35 @@ export function useQuestions(): UseQuestionsReturn {
   const [error, setError] = useState<string | null>(null)
   const currentFiltersRef = useRef<QuestionFilters>({ page: 1, page_size: 6 })
 
-  const refreshQuestions = useCallback(async (filters?: QuestionFilters) => {
+  const refreshQuestions = useCallback(async (filters?: QuestionFilters, forceRefresh = false) => {
     try {
+      const filtersToUse = filters !== undefined ? { ...currentFiltersRef.current, ...filters } : currentFiltersRef.current
+      
+      // Verificar cache si no es un refresh forzado
+      if (!forceRefresh && questionsCache && 
+          Date.now() - questionsCache.timestamp < CACHE_DURATION &&
+          JSON.stringify(questionsCache.filters) === JSON.stringify(filtersToUse)) {
+        setQuestions(questionsCache.items)
+        setPagination(questionsCache.pagination)
+        setLoading(false)
+        if (filters !== undefined) {
+          currentFiltersRef.current = filtersToUse
+        }
+        return
+      }
+
       setLoading(true)
       setError(null)
-      const filtersToUse = filters !== undefined ? { ...currentFiltersRef.current, ...filters } : currentFiltersRef.current
       const response = await questionService.getQuestions(filtersToUse)
+      
+      // Actualizar cache
+      questionsCache = {
+        items: response.items,
+        pagination: response.pagination,
+        filters: filtersToUse,
+        timestamp: Date.now()
+      }
+      
       setQuestions(response.items)
       setPagination(response.pagination)
       if (filters !== undefined) {
@@ -50,6 +84,10 @@ export function useQuestions(): UseQuestionsReturn {
       setError(null)
       const updatedQuestion = await questionService.updateQuestionStatus(questionId, status)
       setQuestions(prev => prev.map(q => q.question_id === questionId ? updatedQuestion : q))
+      
+      // Invalidar cache
+      questionsCache = null
+      
       return updatedQuestion
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
@@ -62,6 +100,10 @@ export function useQuestions(): UseQuestionsReturn {
     try {
       setError(null)
       const updatedQuestion = await questionService.updateQuestion(questionId, formData)
+      
+      // Invalidar cache
+      questionsCache = null
+      
       // No actualizamos el estado local aquí - el componente hará refreshQuestions()
       return updatedQuestion
     } catch (err) {
@@ -76,6 +118,10 @@ export function useQuestions(): UseQuestionsReturn {
       setError(null)
       const updatedQuestion = await questionService.recalculateQuestion(questionId)
       setQuestions(prev => prev.map(q => q.question_id === questionId ? updatedQuestion : q))
+      
+      // Invalidar cache
+      questionsCache = null
+      
       return updatedQuestion
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
@@ -89,6 +135,10 @@ export function useQuestions(): UseQuestionsReturn {
       setError(null)
       const updatedQuestion = await questionService.deleteQuestion(questionId)
       setQuestions(prev => prev.map(q => q.question_id === questionId ? updatedQuestion : q))
+      
+      // Invalidar cache
+      questionsCache = null
+      
       return updatedQuestion
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
