@@ -294,7 +294,7 @@ class AuthService {
   /**
    * Hacer request autenticado con manejo automático de refresh
    */
-  async authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  async authenticatedFetch(url: string, options: RequestInit = {}, customTimeout?: number): Promise<Response> {
     // Verificar si el token necesita ser refrescado (antes de que expire)
     if (this.shouldRefreshToken()) {
       console.log('Token needs refresh, attempting refresh...')
@@ -333,42 +333,58 @@ class AuthService {
           ...options.headers,
         }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    })
+    // Crear AbortController para timeout (usar timeout personalizado si se proporciona)
+    const controller = new AbortController()
+    const timeout = customTimeout || API_CONFIG.TIMEOUT
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
 
-    // Si recibimos 401, intentar refrescar el token una vez más
-    if (response.status === 401) {
-      console.log('Received 401, attempting token refresh...')
-      const refreshed = await this.refreshToken()
-      if (refreshed) {
-        // Reintentar la request con el nuevo token
-        const newAuthHeaders = this.getAuthHeaders()
-        const newHeaders = isFormData 
-          ? {
-              ...newAuthHeaders,
-              ...options.headers,
-            }
-          : {
-              ...API_CONFIG.DEFAULT_HEADERS,
-              ...newAuthHeaders,
-              ...options.headers,
-            }
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      })
+      
+      clearTimeout(timeoutId)
+      
+      // Si recibimos 401, intentar refrescar el token una vez más
+      if (response.status === 401) {
+        console.log('Received 401, attempting token refresh...')
+        const refreshed = await this.refreshToken()
+        if (refreshed) {
+          // Reintentar la request con el nuevo token
+          const newAuthHeaders = this.getAuthHeaders()
+          const newHeaders = isFormData 
+            ? {
+                ...newAuthHeaders,
+                ...options.headers,
+              }
+            : {
+                ...API_CONFIG.DEFAULT_HEADERS,
+                ...newAuthHeaders,
+                ...options.headers,
+              }
 
-        console.log('Retrying request with new token...')
-        return fetch(url, {
-          ...options,
-          headers: newHeaders,
-        })
-      } else {
-        console.error('Failed to refresh token after 401, logging out')
-        this.logout()
-        throw new Error('Sesión expirada')
+          console.log('Retrying request with new token...')
+          return fetch(url, {
+            ...options,
+            headers: newHeaders,
+          })
+        } else {
+          console.error('Failed to refresh token after 401, logging out')
+          this.logout()
+          throw new Error('Sesión expirada')
+        }
       }
-    }
 
-    return response
+      return response
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Timeout: La petición tardó más de ${timeout / 1000} segundos`)
+      }
+      throw error
+    }
   }
 }
 
