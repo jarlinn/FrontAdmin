@@ -12,14 +12,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
-import { Upload, FileText, X, Brain, Save, Eye, Loader2, CheckCircle, Plus, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Upload, FileText, X, Brain, Save, Eye, Loader2, CheckCircle, Plus, ChevronDown, ChevronRight, Edit, Trash2, MoreHorizontal, Settings, Tag, Layers } from "lucide-react"
 import AdminLayout from "@/components/admin-layout"
 import { useDropzone } from "react-dropzone"
 import { buildApiUrl, API_CONFIG, handleApiError } from "@/lib/api-config"
 import { useAuthFetch } from "@/hooks/use-auth-fetch"
-import { useCategories, useCategoriesTree } from "@/hooks/use-categories"
 import { useQuestions } from "@/hooks/use-questions"
-import { Category, CategoryTree } from "@/lib/categories"
+import { useModalities } from "@/hooks/use-modalities"
+import { useSubmodalities, useSubmodalitiesByModality } from "@/hooks/use-submodalities"
+import { useNewCategories, useCategoriesBySubmodality } from "@/hooks/use-new-categories"
+import { Modality, Submodality } from "@/lib/modalities"
+import { NewCategory } from "@/lib/new-categories"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
@@ -31,14 +35,14 @@ interface UploadedFile {
   id: string
 }
 
-
-
 export default function ContentPage() {
   const router = useRouter()
   const [question, setQuestion] = useState("")
   const [context, setContext] = useState("")
   const [contextType, setContextType] = useState<"text" | "pdf">("text")
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("")
+  const [selectedModalityId, setSelectedModalityId] = useState<string>("")
+  const [selectedSubmodalityId, setSelectedSubmodalityId] = useState<string>("")
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
@@ -47,594 +51,322 @@ export default function ContentPage() {
   const [isEditingResponse, setIsEditingResponse] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null)
-  
-  // Estados para crear categoría
-  const [isCreateCategoryOpen, setIsCreateCategoryOpen] = useState(false)
-  const [newCategoryName, setNewCategoryName] = useState("")
-  const [newCategoryDescription, setNewCategoryDescription] = useState("")
-  const [newCategoryParentId, setNewCategoryParentId] = useState<string>("none")
-  const [isCreatingCategory, setIsCreatingCategory] = useState(false)
-  
-  // Estados para selector de árbol en diálogo de crear categoría
-  const [createDialogExpandedCategories, setCreateDialogExpandedCategories] = useState<Set<string>>(new Set())
-  const [createDialogSelectedPath, setCreateDialogSelectedPath] = useState<CategoryTree[]>([])
-  const [isCreateDialogTreeSelectorOpen, setIsCreateDialogTreeSelectorOpen] = useState(false)
-  const createDialogTreeSelectorRef = useRef<HTMLDivElement>(null)
-  
-  // Estados para editar/eliminar categorías
-  const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false)
-  const [editingCategory, setEditingCategory] = useState<CategoryTree | null>(null)
-  const [editCategoryName, setEditCategoryName] = useState("")
-  const [editCategoryDescription, setEditCategoryDescription] = useState("")
-  const [editCategoryParentId, setEditCategoryParentId] = useState<string>("none")
-  const [editCategoryIsActive, setEditCategoryIsActive] = useState(true)
-  const [isUpdatingCategory, setIsUpdatingCategory] = useState(false)
-  
-  // Estados para selector de árbol en diálogo de editar categoría
-  const [editDialogExpandedCategories, setEditDialogExpandedCategories] = useState<Set<string>>(new Set())
-  const [editDialogSelectedPath, setEditDialogSelectedPath] = useState<CategoryTree[]>([])
-  const [isEditDialogTreeSelectorOpen, setIsEditDialogTreeSelectorOpen] = useState(false)
-  const editDialogTreeSelectorRef = useRef<HTMLDivElement>(null)
-  
-  // Estados para seleccionar categoría a editar/eliminar
-  const [selectedCategoryToManage, setSelectedCategoryToManage] = useState<CategoryTree | null>(null)
-  const [isManageCategorySelectorOpen, setIsManageCategorySelectorOpen] = useState(false)
-  const manageCategorySelectorRef = useRef<HTMLDivElement>(null)
-  
-  // Estados para selector de árbol
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
-  const [selectedPath, setSelectedPath] = useState<CategoryTree[]>([])
-  const [isTreeSelectorOpen, setIsTreeSelectorOpen] = useState(false)
-  const treeSelectorRef = useRef<HTMLDivElement>(null)
+  const [selectedPath, setSelectedPath] = useState<any[]>([])
 
-  // Hook para requests autenticados
-  const { fetchData, loading, error } = useAuthFetch({
-    onError: (errorMessage) => {
-      setGeneratedResponse(`❌ ${errorMessage}\n\nPor favor, verifica tu conexión a internet y que la API esté funcionando correctamente.`)
-      setShowPreview(true)
-    }
-  })
+  // Estados para modalidades
+  const [isCreateModalityOpen, setIsCreateModalityOpen] = useState(false)
+  const [isEditModalityOpen, setIsEditModalityOpen] = useState(false)
+  const [newModalityName, setNewModalityName] = useState("")
+  const [newModalityDescription, setNewModalityDescription] = useState("")
+  const [editingModality, setEditingModality] = useState<Modality | null>(null)
+  const [isSubmittingModality, setIsSubmittingModality] = useState(false)
 
-  // Hook para manejar preguntas
-  const { updateQuestion } = useQuestions()
+  // Estados para submodalidades
+  const [isCreateSubmodalityOpen, setIsCreateSubmodalityOpen] = useState(false)
+  const [isEditSubmodalityOpen, setIsEditSubmodalityOpen] = useState(false)
+  const [newSubmodalityName, setNewSubmodalityName] = useState("")
+  const [newSubmodalityDescription, setNewSubmodalityDescription] = useState("")
+  const [newSubmodalityModalityId, setNewSubmodalityModalityId] = useState("")
+  const [editingSubmodality, setEditingSubmodality] = useState<Submodality | null>(null)
+  const [isSubmittingSubmodality, setIsSubmittingSubmodality] = useState(false)
 
-  // Hook para categorías
-  const { categories, loading: categoriesLoading, error: categoriesError, createCategory, updateCategory, deleteCategory, refreshCategories } = useCategories()
-  
-  // Hook para árbol de categorías
-  const { categoriesTree, loading: treeLoading, error: treeError } = useCategoriesTree()
+  // Estados para categorías nuevas
+  const [isCreateNewCategoryOpen, setIsCreateNewCategoryOpen] = useState(false)
+  const [isEditNewCategoryOpen, setIsEditNewCategoryOpen] = useState(false)
+  const [newCategoryHierName, setNewCategoryHierName] = useState("")
+  const [newCategoryHierDescription, setNewCategoryHierDescription] = useState("")
+  const [newCategorySubmodalityId, setNewCategorySubmodalityId] = useState("")
+  const [editingNewCategory, setEditingNewCategory] = useState<NewCategory | null>(null)
+  const [isSubmittingNewCategory, setIsSubmittingNewCategory] = useState(false)
 
-  // Cerrar selector de árbol cuando se hace clic fuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (treeSelectorRef.current && !treeSelectorRef.current.contains(event.target as Node)) {
-        setIsTreeSelectorOpen(false)
-      }
-    }
+  // Hooks
+  const { fetchData, loading: authLoading } = useAuthFetch()
+  const { questions, loading: questionsLoading, refreshQuestions } = useQuestions()
+  const { 
+    modalities, 
+    loading: modalitiesLoading, 
+    error: modalitiesError,
+    createModality, 
+    updateModality, 
+    deleteModality,
+    refreshModalities
+  } = useModalities()
 
-    if (isTreeSelectorOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
+  const { 
+    submodalities, 
+    loading: submodalitiesLoading, 
+    error: submodalitiesError,
+    createSubmodality, 
+    updateSubmodality, 
+    deleteSubmodality
+  } = useSubmodalities()
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isTreeSelectorOpen])
+  const { 
+    submodalities: submodalitiesByModality, 
+    loading: submodalitiesByModalityLoading
+  } = useSubmodalitiesByModality(selectedModalityId)
 
-  // Cerrar selector de árbol del diálogo cuando se hace clic fuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (createDialogTreeSelectorRef.current && !createDialogTreeSelectorRef.current.contains(event.target as Node)) {
-        setIsCreateDialogTreeSelectorOpen(false)
-      }
-    }
+  const { 
+    newCategories, 
+    loading: newCategoriesLoading, 
+    error: newCategoriesError,
+    createNewCategory, 
+    updateNewCategory, 
+    deleteNewCategory
+  } = useNewCategories()
 
-    if (isCreateDialogTreeSelectorOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
+  const { 
+    categories: categoriesBySubmodality, 
+    loading: categoriesBySubmodalityLoading
+  } = useCategoriesBySubmodality(selectedSubmodalityId)
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isCreateDialogTreeSelectorOpen])
+  // Funciones para manejar modalidades
+  const handleCreateModality = async () => {
+    if (!newModalityName.trim()) return
 
-  // Cerrar selector de árbol del diálogo de editar cuando se hace clic fuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (editDialogTreeSelectorRef.current && !editDialogTreeSelectorRef.current.contains(event.target as Node)) {
-        setIsEditDialogTreeSelectorOpen(false)
-      }
-    }
-
-    if (isEditDialogTreeSelectorOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isEditDialogTreeSelectorOpen])
-
-  // Cerrar selector de categoría para gestionar cuando se hace clic fuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (manageCategorySelectorRef.current && !manageCategorySelectorRef.current.contains(event.target as Node)) {
-        setIsManageCategorySelectorOpen(false)
-      }
-    }
-
-    if (isManageCategorySelectorOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isManageCategorySelectorOpen])
-
-  // Función helper para organizar categorías en jerarquía
-  const getCategoryDisplayName = (category: Category) => {
-    const displayName = category.display_name || category.name
-    // Si tiene parent_id, agregar indentación visual
-    if (category.parent_id) {
-      return `└─ ${displayName}`
-    }
-    return displayName
-  }
-
-  // Organizar categorías por jerarquía (padres primero, luego hijos)
-  const organizedCategories = [...categories].sort((a, b) => {
-    // Categorías principales primero
-    if (!a.parent_id && b.parent_id) return -1
-    if (a.parent_id && !b.parent_id) return 1
-    // Dentro del mismo nivel, ordenar alfabéticamente
-    const nameA = a.display_name || a.name
-    const nameB = b.display_name || b.name
-    return nameA.localeCompare(nameB)
-  })
-
-  // Funciones para el selector de árbol
-  const toggleCategoryExpansion = (categoryId: string) => {
-    const newExpanded = new Set(expandedCategories)
-    if (newExpanded.has(categoryId)) {
-      newExpanded.delete(categoryId)
-    } else {
-      newExpanded.add(categoryId)
-    }
-    setExpandedCategories(newExpanded)
-  }
-
-  const selectCategory = (category: CategoryTree, path: CategoryTree[]) => {
-    setSelectedCategoryId(category.id)
-    setSelectedPath([...path, category])
-    setIsTreeSelectorOpen(false)
-  }
-
-  const getSelectedCategoryDisplay = () => {
-    if (selectedPath.length === 0) return "Selecciona una categoría"
-    return selectedPath.map(cat => cat.name).join(" > ")
-  }
-
-  // Funciones para el selector de árbol del diálogo de crear categoría
-  const toggleCreateDialogCategoryExpansion = (categoryId: string) => {
-    const newExpanded = new Set(createDialogExpandedCategories)
-    if (newExpanded.has(categoryId)) {
-      newExpanded.delete(categoryId)
-    } else {
-      newExpanded.add(categoryId)
-    }
-    setCreateDialogExpandedCategories(newExpanded)
-  }
-
-  const selectCreateDialogCategory = (category: CategoryTree, path: CategoryTree[]) => {
-    setNewCategoryParentId(category.id)
-    setCreateDialogSelectedPath([...path, category])
-    setIsCreateDialogTreeSelectorOpen(false)
-  }
-
-  const getCreateDialogSelectedCategoryDisplay = () => {
-    if (newCategoryParentId === "none") return "Sin categoría padre (Categoría principal)"
-    if (createDialogSelectedPath.length === 0) return "Selecciona una categoría padre (opcional)"
-    return createDialogSelectedPath.map(cat => cat.name).join(" > ")
-  }
-
-  // Función helper para generar indicadores de nivel
-  const getLevelIndicator = (level: number) => {
-    if (level === 0) return ""
-    if (level === 1) return "└─ "
-    // Para niveles más profundos, usar espacios y líneas para mostrar jerarquía
-    return "└─ "
-  }
-
-  // Funciones para gestionar categorías (editar/eliminar)
-  const selectCategoryToManage = (category: CategoryTree, path: CategoryTree[]) => {
-    setSelectedCategoryToManage(category)
-    setIsManageCategorySelectorOpen(false)
-  }
-
-  const openEditCategory = () => {
-    if (!selectedCategoryToManage) return
-    
-    setEditingCategory(selectedCategoryToManage)
-    setEditCategoryName(selectedCategoryToManage.name)
-    setEditCategoryDescription(selectedCategoryToManage.description || "")
-    setEditCategoryIsActive(selectedCategoryToManage.is_active)
-    
-    // Encontrar la categoría padre en el árbol para establecer el path
-    const findParentPath = (categories: CategoryTree[], targetId: string): CategoryTree[] => {
-      for (const category of categories) {
-        if (category.id === targetId) {
-          return [category]
-        }
-        if (category.children.length > 0) {
-          const childPath = findParentPath(category.children, targetId)
-          if (childPath.length > 0) {
-            return [category, ...childPath]
-          }
-        }
-      }
-      return []
-    }
-
-    // Si tiene parent_id, encontrar el path del padre
-    if (selectedCategoryToManage.full_path && selectedCategoryToManage.full_path.includes('/')) {
-      // Buscar la categoría padre por el full_path
-      const pathParts = selectedCategoryToManage.full_path.split('/')
-      pathParts.pop() // Remover la categoría actual
-      const parentPath = pathParts.join('/')
-      
-      const findCategoryByPath = (categories: CategoryTree[], path: string): CategoryTree | null => {
-        for (const category of categories) {
-          if (category.full_path === path) {
-            return category
-          }
-          if (category.children.length > 0) {
-            const found = findCategoryByPath(category.children, path)
-            if (found) return found
-          }
-        }
-        return null
-      }
-      
-      const parentCategory = findCategoryByPath(categoriesTree, parentPath)
-      if (parentCategory) {
-        setEditCategoryParentId(parentCategory.id)
-        setEditDialogSelectedPath(findParentPath(categoriesTree, parentCategory.id))
-      } else {
-        setEditCategoryParentId("none")
-        setEditDialogSelectedPath([])
-      }
-    } else {
-      setEditCategoryParentId("none")
-      setEditDialogSelectedPath([])
-    }
-    
-    setIsEditCategoryOpen(true)
-  }
-
-  const handleUpdateCategory = async () => {
-    if (!editingCategory || !editCategoryName.trim()) return
-
-    setIsUpdatingCategory(true)
+    setIsSubmittingModality(true)
     try {
-      await updateCategory(editingCategory.id, {
-        name: editCategoryName.trim(),
-        description: editCategoryDescription.trim() || undefined,
-        parent_id: editCategoryParentId === "none" ? null : editCategoryParentId,
-        is_active: editCategoryIsActive
+      await createModality({
+        name: newModalityName,
+        description: newModalityDescription || undefined
       })
       
-      // Limpiar formulario y cerrar diálogo
-      setEditCategoryName("")
-      setEditCategoryDescription("")
-      setEditCategoryParentId("none")
-      setEditCategoryIsActive(true)
-      setEditDialogSelectedPath([])
-      setEditDialogExpandedCategories(new Set())
-      setEditingCategory(null)
-      setIsEditCategoryOpen(false)
-      setSelectedCategoryToManage(null)
+      setNewModalityName("")
+      setNewModalityDescription("")
+      setIsCreateModalityOpen(false)
       
-      // Refrescar las listas
-      refreshCategories()
+      console.log("Modalidad creada exitosamente")
+    } catch (error) {
+      console.error("Error al crear modalidad:", error)
+    } finally {
+      setIsSubmittingModality(false)
+    }
+  }
+
+  const handleEditModality = async () => {
+    if (!editingModality || !newModalityName.trim()) return
+
+    setIsSubmittingModality(true)
+    try {
+      await updateModality(editingModality.id, {
+        name: newModalityName,
+        description: newModalityDescription || undefined
+      })
+      
+      setNewModalityName("")
+      setNewModalityDescription("")
+      setEditingModality(null)
+      setIsEditModalityOpen(false)
+      
+      console.log("Modalidad actualizada exitosamente")
+    } catch (error) {
+      console.error("Error al actualizar modalidad:", error)
+    } finally {
+      setIsSubmittingModality(false)
+    }
+  }
+
+  const handleDeleteModality = async (modalityId: string) => {
+    try {
+      await deleteModality(modalityId)
+      console.log("Modalidad eliminada exitosamente")
+    } catch (error) {
+      console.error("Error al eliminar modalidad:", error)
+    }
+  }
+
+  const openEditModality = (modality: Modality) => {
+    setEditingModality(modality)
+    setNewModalityName(modality.name)
+    setNewModalityDescription(modality.description || "")
+    setIsEditModalityOpen(true)
+  }
+
+  // Funciones para manejar submodalidades
+  const handleCreateSubmodality = async () => {
+    if (!newSubmodalityName.trim() || !newSubmodalityModalityId) return
+
+    setIsSubmittingSubmodality(true)
+    try {
+      await createSubmodality({
+        name: newSubmodalityName,
+        description: newSubmodalityDescription || undefined,
+        modality_id: newSubmodalityModalityId
+      })
+      
+      setNewSubmodalityName("")
+      setNewSubmodalityDescription("")
+      setNewSubmodalityModalityId("")
+      setIsCreateSubmodalityOpen(false)
+      
+      console.log("Submodalidad creada exitosamente")
+    } catch (error) {
+      console.error("Error al crear submodalidad:", error)
+    } finally {
+      setIsSubmittingSubmodality(false)
+    }
+  }
+
+  const handleEditSubmodality = async () => {
+    if (!editingSubmodality || !newSubmodalityName.trim()) return
+
+    setIsSubmittingSubmodality(true)
+    try {
+      await updateSubmodality(editingSubmodality.id, {
+        name: newSubmodalityName,
+        description: newSubmodalityDescription || undefined,
+        modality_id: newSubmodalityModalityId || editingSubmodality.modality_id
+      })
+      
+      setNewSubmodalityName("")
+      setNewSubmodalityDescription("")
+      setNewSubmodalityModalityId("")
+      setEditingSubmodality(null)
+      setIsEditSubmodalityOpen(false)
+      
+      console.log("Submodalidad actualizada exitosamente")
+    } catch (error) {
+      console.error("Error al actualizar submodalidad:", error)
+    } finally {
+      setIsSubmittingSubmodality(false)
+    }
+  }
+
+  const handleDeleteSubmodality = async (submodalityId: string) => {
+    try {
+      await deleteSubmodality(submodalityId)
+      console.log("Submodalidad eliminada exitosamente")
+    } catch (error) {
+      console.error("Error al eliminar submodalidad:", error)
+    }
+  }
+
+  const openEditSubmodality = (submodality: Submodality) => {
+    setEditingSubmodality(submodality)
+    setNewSubmodalityName(submodality.name)
+    setNewSubmodalityDescription(submodality.description || "")
+    setNewSubmodalityModalityId(submodality.modality_id)
+    setIsEditSubmodalityOpen(true)
+  }
+
+  // Funciones para manejar categorías nuevas
+  const handleCreateNewCategory = async () => {
+    if (!newCategoryHierName.trim() || !newCategorySubmodalityId) return
+
+    setIsSubmittingNewCategory(true)
+    try {
+      await createNewCategory({
+        name: newCategoryHierName,
+        description: newCategoryHierDescription || undefined,
+        submodality_id: newCategorySubmodalityId
+      })
+      
+      setNewCategoryHierName("")
+      setNewCategoryHierDescription("")
+      setNewCategorySubmodalityId("")
+      setIsCreateNewCategoryOpen(false)
+      
+      console.log("Categoría creada exitosamente")
+    } catch (error) {
+      console.error("Error al crear categoría:", error)
+    } finally {
+      setIsSubmittingNewCategory(false)
+    }
+  }
+
+  const handleEditNewCategory = async () => {
+    if (!editingNewCategory || !newCategoryHierName.trim()) return
+
+    setIsSubmittingNewCategory(true)
+    try {
+      await updateNewCategory(editingNewCategory.id, {
+        name: newCategoryHierName,
+        description: newCategoryHierDescription || undefined,
+        submodality_id: newCategorySubmodalityId || editingNewCategory.submodality_id
+      })
+      
+      setNewCategoryHierName("")
+      setNewCategoryHierDescription("")
+      setNewCategorySubmodalityId("")
+      setEditingNewCategory(null)
+      setIsEditNewCategoryOpen(false)
       
       console.log("Categoría actualizada exitosamente")
     } catch (error) {
       console.error("Error al actualizar categoría:", error)
     } finally {
-      setIsUpdatingCategory(false)
+      setIsSubmittingNewCategory(false)
     }
   }
 
-  const handleDeleteCategory = async () => {
-    if (!selectedCategoryToManage) return
-
+  const handleDeleteNewCategory = async (categoryId: string) => {
     try {
-      await deleteCategory(selectedCategoryToManage.id)
-      setSelectedCategoryToManage(null)
-      
-      // Refrescar las listas
-      refreshCategories()
-      
+      await deleteNewCategory(categoryId)
       console.log("Categoría eliminada exitosamente")
     } catch (error) {
       console.error("Error al eliminar categoría:", error)
     }
   }
 
-  // Funciones para el selector de árbol del diálogo de editar categoría
-  const toggleEditDialogCategoryExpansion = (categoryId: string) => {
-    const newExpanded = new Set(editDialogExpandedCategories)
-    if (newExpanded.has(categoryId)) {
-      newExpanded.delete(categoryId)
-    } else {
-      newExpanded.add(categoryId)
-    }
-    setEditDialogExpandedCategories(newExpanded)
+  const openEditNewCategory = (category: NewCategory) => {
+    setEditingNewCategory(category)
+    setNewCategoryHierName(category.name)
+    setNewCategoryHierDescription(category.description || "")
+    setNewCategorySubmodalityId(category.submodality_id)
+    setIsEditNewCategoryOpen(true)
   }
 
-  const selectEditDialogCategory = (category: CategoryTree, path: CategoryTree[]) => {
-    setEditCategoryParentId(category.id)
-    setEditDialogSelectedPath([...path, category])
-    setIsEditDialogTreeSelectorOpen(false)
-  }
-
-  const getEditDialogSelectedCategoryDisplay = () => {
-    if (editCategoryParentId === "none") return "Sin categoría padre (Categoría principal)"
-    if (editDialogSelectedPath.length === 0) return "Selecciona una categoría padre (opcional)"
-    return editDialogSelectedPath.map(cat => cat.name).join(" > ")
-  }
-
-  // Componente para renderizar el árbol de categorías (selector principal)
-  const renderCategoryTree = (categories: CategoryTree[], path: CategoryTree[] = [], level: number = 0) => {
-    return categories.map((category) => (
-      <div key={category.id} style={{ marginLeft: `${level * 16}px` }}>
-        <div className="flex items-center space-x-2 py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
-          {category.children.length > 0 ? (
-            <button
-              onClick={() => toggleCategoryExpansion(category.id)}
-              className="flex items-center justify-center w-4 h-4"
-            >
-              {expandedCategories.has(category.id) ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          ) : (
-            <div className="w-4 h-4" />
-          )}
-          <button
-            onClick={() => selectCategory(category, path)}
-            className="flex-1 text-left text-sm hover:text-primary"
-          >
-            {/* Agregar indicador visual del nivel */}
-            {level > 0 && <span className="text-muted-foreground mr-1">{getLevelIndicator(level)}</span>}
-            {category.name}
-            {category.questions_count > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                {category.questions_count}
-              </Badge>
-            )}
-          </button>
-        </div>
-        {expandedCategories.has(category.id) && category.children.length > 0 && (
-          <div>
-            {renderCategoryTree(category.children, [...path, category], level + 1)}
-          </div>
-        )}
-      </div>
-    ))
-  }
-
-  // Componente para renderizar el árbol de categorías (diálogo de crear categoría)
-  const renderCreateDialogCategoryTree = (categories: CategoryTree[], path: CategoryTree[] = [], level: number = 0) => {
-    return categories.map((category) => (
-      <div key={category.id} style={{ marginLeft: `${level * 16}px` }}>
-        <div className="flex items-center space-x-2 py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
-          {category.children.length > 0 ? (
-            <button
-              onClick={() => toggleCreateDialogCategoryExpansion(category.id)}
-              className="flex items-center justify-center w-4 h-4"
-            >
-              {createDialogExpandedCategories.has(category.id) ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          ) : (
-            <div className="w-4 h-4" />
-          )}
-          <button
-            onClick={() => selectCreateDialogCategory(category, path)}
-            className="flex-1 text-left text-sm hover:text-primary"
-          >
-            {/* Agregar indicador visual del nivel */}
-            {level > 0 && <span className="text-muted-foreground mr-1">{getLevelIndicator(level)}</span>}
-            {category.name}
-            {category.questions_count > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                {category.questions_count}
-              </Badge>
-            )}
-          </button>
-        </div>
-        {createDialogExpandedCategories.has(category.id) && category.children.length > 0 && (
-          <div>
-            {renderCreateDialogCategoryTree(category.children, [...path, category], level + 1)}
-          </div>
-        )}
-      </div>
-    ))
-  }
-
-  // Componente para renderizar el árbol de categorías (diálogo de editar categoría)
-  const renderEditDialogCategoryTree = (categories: CategoryTree[], path: CategoryTree[] = [], level: number = 0) => {
-    return categories.map((category) => (
-      <div key={category.id} style={{ marginLeft: `${level * 16}px` }}>
-        <div className="flex items-center space-x-2 py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
-          {category.children.length > 0 ? (
-            <button
-              onClick={() => toggleEditDialogCategoryExpansion(category.id)}
-              className="flex items-center justify-center w-4 h-4"
-            >
-              {editDialogExpandedCategories.has(category.id) ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          ) : (
-            <div className="w-4 h-4" />
-          )}
-          <button
-            onClick={() => selectEditDialogCategory(category, path)}
-            className="flex-1 text-left text-sm hover:text-primary"
-          >
-            {/* Agregar indicador visual del nivel */}
-            {level > 0 && <span className="text-muted-foreground mr-1">{getLevelIndicator(level)}</span>}
-            {category.name}
-            {category.questions_count > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                {category.questions_count}
-              </Badge>
-            )}
-          </button>
-        </div>
-        {editDialogExpandedCategories.has(category.id) && category.children.length > 0 && (
-          <div>
-            {renderEditDialogCategoryTree(category.children, [...path, category], level + 1)}
-          </div>
-        )}
-      </div>
-    ))
-  }
-
-  // Componente para renderizar el árbol de categorías (selector para gestionar)
-  const renderManageCategoryTree = (categories: CategoryTree[], path: CategoryTree[] = [], level: number = 0) => {
-    return categories.map((category) => (
-      <div key={category.id} style={{ marginLeft: `${level * 16}px` }}>
-        <div className="flex items-center space-x-2 py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
-          {category.children.length > 0 ? (
-            <button
-              onClick={() => toggleCategoryExpansion(category.id)}
-              className="flex items-center justify-center w-4 h-4"
-            >
-              {expandedCategories.has(category.id) ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          ) : (
-            <div className="w-4 h-4" />
-          )}
-          <button
-            onClick={() => selectCategoryToManage(category, path)}
-            className="flex-1 text-left text-sm hover:text-primary"
-          >
-            {/* Agregar indicador visual del nivel */}
-            {level > 0 && <span className="text-muted-foreground mr-1">{getLevelIndicator(level)}</span>}
-            {category.name}
-            {category.questions_count > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                {category.questions_count}
-              </Badge>
-            )}
-          </button>
-        </div>
-        {expandedCategories.has(category.id) && category.children.length > 0 && (
-          <div>
-            {renderManageCategoryTree(category.children, [...path, category], level + 1)}
-          </div>
-        )}
-      </div>
-    ))
-  }
-
+  // Funciones para manejo de archivos
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (contextType !== "pdf") return
     
-    // Limpiar archivos anteriores ya que la API solo acepta un tipo de contexto
     setUploadedFiles([])
     
-    const newFiles = acceptedFiles.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-      id: Math.random().toString(36).substr(2, 9),
-    }))
-    setUploadedFiles(newFiles)
+    acceptedFiles.forEach((file) => {
+      if (file.type === "application/pdf") {
+        const uploadedFile: UploadedFile = {
+          file,
+          preview: file.name,
+          id: Math.random().toString(36).substr(2, 9)
+        }
+        setUploadedFiles(prev => [...prev, uploadedFile])
+      }
+    })
+    
+    if (acceptedFiles.length > 0 && contextType !== "pdf") {
+      setContextType("pdf")
+      setContext("")
+    }
   }, [contextType])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
-      "application/pdf": [".pdf"],
+      'application/pdf': ['.pdf']
     },
-    multiple: false,
+    multiple: true
   })
 
   const removeFile = (id: string) => {
-    setUploadedFiles((prev) => prev.filter((file) => file.id !== id))
+    setUploadedFiles(prev => prev.filter(file => file.id !== id))
   }
 
-  const handleContextTypeChange = (type: "text" | "pdf") => {
-    setContextType(type)
-    // Limpiar campos del otro tipo
-    if (type === "text") {
-      setUploadedFiles([])
-    } else {
-      setContext("")
-    }
-  }
-
-  const handleCreateCategory = async () => {
-    if (!newCategoryName.trim()) return
-
-    setIsCreatingCategory(true)
-    try {
-      const newCategory = await createCategory({
-        name: newCategoryName.trim(),
-        description: newCategoryDescription.trim() || undefined,
-        parent_id: newCategoryParentId === "none" ? null : newCategoryParentId
-      })
-      
-      // Seleccionar automáticamente la nueva categoría
-      setSelectedCategoryId(newCategory.id)
-      
-      // Limpiar formulario y cerrar diálogo
-      setNewCategoryName("")
-      setNewCategoryDescription("")
-      setNewCategoryParentId("none")
-      setCreateDialogSelectedPath([])
-      setCreateDialogExpandedCategories(new Set())
-      setIsCreateCategoryOpen(false)
-      
-      // Mostrar mensaje de éxito (opcional)
-      console.log("Categoría creada exitosamente:", newCategory.display_name || newCategory.name)
-    } catch (error) {
-      console.error("Error al crear categoría:", error)
-      // El error ya se maneja en el hook
-    } finally {
-      setIsCreatingCategory(false)
-    }
-  }
-
-  const generateResponse = async () => {
-    if (!question.trim()) return
-    
-    // Validar que se tenga el contexto necesario según el tipo
-    if (contextType === 'text' && !context.trim()) {
-      alert('Debes agregar contexto de texto')
+  // Función para generar respuesta
+  const handleGenerateResponse = async () => {
+    if (!question.trim()) {
+      alert('Debes escribir una pregunta')
       return
     }
-    if (contextType === 'pdf' && uploadedFiles.length === 0) {
-      alert('Debes subir un archivo PDF')
+    if (contextType === "text" && !context.trim()) {
+      alert('Debes proporcionar contexto en texto')
       return
     }
-    if (!selectedCategoryId) {
-      alert('Debes seleccionar una categoría')
+    if (contextType === "pdf" && uploadedFiles.length === 0) {
+      alert('Debes subir al menos un archivo PDF')
+      return
+    }
+    if (!selectedModalityId) {
+      alert('Debes seleccionar una modalidad')
       return
     }
 
@@ -644,100 +376,80 @@ export default function ContentPage() {
     setCurrentQuestionId(null)
 
     try {
-      // Crear FormData para enviar a la API
       const formData = new FormData()
       formData.append('question_text', question)
       formData.append('context_type', contextType)
-      formData.append('category_id', selectedCategoryId)
       
-      // Agregar el contexto según el tipo seleccionado
-      if (contextType === 'text') {
-        formData.append('context_text', context)
-      } else if (contextType === 'pdf' && uploadedFiles.length > 0) {
-        formData.append('context_file', uploadedFiles[0].file)
+      formData.append('modality_id', selectedModalityId)
+      if (selectedSubmodalityId) {
+        formData.append('submodality_id', selectedSubmodalityId)
+      }
+      if (selectedCategoryId) {
+        formData.append('category_id', selectedCategoryId)
       }
 
-      // Simular progreso mientras se procesa
-      const progressInterval = setInterval(() => {
-        setGenerationProgress((prev) => {
-          if (prev >= 90) return prev
-          return prev + Math.random() * 20
+      if (contextType === "text") {
+        formData.append('context_text', context)
+      } else if (contextType === "pdf" && uploadedFiles.length > 0) {
+        uploadedFiles.forEach((uploadedFile) => {
+          formData.append('context_files', uploadedFile.file)
         })
+      }
+
+      const progressInterval = setInterval(() => {
+        setGenerationProgress(prev => Math.min(prev + 10, 90))
       }, 500)
 
-      // Determinar qué endpoint usar basado en el tipo de contexto
-      const endpoint = contextType === 'pdf' 
-        ? API_CONFIG.ENDPOINTS.QUESTIONS_NO_SLASH  // Sin slash para PDF
-        : API_CONFIG.ENDPOINTS.QUESTIONS           // Con slash para texto
-
-      // Usar el hook de autenticación para hacer la request
-      const data = await fetchData(buildApiUrl(endpoint), {
+      const response = await fetchData('/chat/questions/', {
         method: 'POST',
-        body: formData,
-        // No agregar Content-Type header para FormData, el browser lo maneja automáticamente
-        headers: {
-          // Remover Content-Type para que el browser agregue el boundary correcto
-        }
+        body: formData
       })
 
       clearInterval(progressInterval)
       setGenerationProgress(100)
-      
-      // Guardar toda la respuesta para referencia
-      setGeneratedResponse(JSON.stringify(data))
-      
-      // Extraer el question_id si está disponible
-      if (data && typeof data === 'object' && data.question_id) {
-        setCurrentQuestionId(data.question_id)
-      }
-      
-      // Extraer solo el model_response para mostrar y editar
-      let modelResponse = ""
-      try {
-        if (data && typeof data === 'object' && data.model_response) {
-          modelResponse = data.model_response
-        } else if (typeof data === 'string') {
-          const parsed = JSON.parse(data)
-          modelResponse = parsed.model_response || data
-        } else {
-          modelResponse = JSON.stringify(data)
-        }
-      } catch (error) {
-        console.error("Error parsing model_response:", error)
-        modelResponse = data.response || data.answer || data.message || JSON.stringify(data)
-      }
-      
-      setEditableModelResponse(modelResponse)
-      setShowPreview(true)
 
+      if (response) {
+        setGeneratedResponse(response.response)
+        
+        if (response.id) {
+          setCurrentQuestionId(response.id)
+        }
+
+        setEditableModelResponse(response.response)
+        setShowPreview(true)
+        
+        console.log("Pregunta generada exitosamente:", response)
+      }
     } catch (error) {
-      console.error('Error al generar respuesta:', error)
-      // El error ya se maneja en el hook useAuthFetch
+      console.error("Error al generar respuesta:", error)
     } finally {
       setIsGenerating(false)
     }
   }
 
-  const saveContent = async () => {
+  // Función para actualizar respuesta
+  const handleUpdateResponse = async () => {
     if (!editableModelResponse.trim()) {
-      alert('No hay respuesta para guardar')
+      alert('La respuesta no puede estar vacía')
       return
     }
-
+    
     if (!currentQuestionId) {
-      alert('No hay pregunta generada para actualizar')
+      alert('No hay una pregunta para actualizar')
       return
     }
 
     try {
-      // Crear FormData con la respuesta editada
-      const formData = new FormData()
-      formData.append('model_response', editableModelResponse)
+      const response = await fetchData(`/chat/questions/${currentQuestionId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          response: editableModelResponse
+        })
+      })
 
-      // Usar el hook para actualizar la pregunta
-      await updateQuestion(currentQuestionId, formData)
-
-      // Reset form
       setQuestion("")
       setContext("")
       setUploadedFiles([])
@@ -746,768 +458,1085 @@ export default function ContentPage() {
       setIsEditingResponse(false)
       setShowPreview(false)
       setSelectedCategoryId("")
+      setSelectedModalityId("")
+      setSelectedSubmodalityId("")
       setSelectedPath([])
       setCurrentQuestionId(null)
-
-      // Mostrar mensaje de éxito y redirigir
-      alert("Respuesta actualizada exitosamente!")
-      router.push("/dashboard/validation")
       
+      console.log("Respuesta actualizada exitosamente:", response)
+      
+      router.refresh()
     } catch (error) {
-      console.error('Error al actualizar pregunta:', error)
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      alert(`Error al actualizar la respuesta: ${errorMessage}`)
+      console.error("Error al actualizar respuesta:", error)
     }
   }
 
   return (
     <AdminLayout>
       <div className="space-y-8">
-        {/* Header */}
+        {/* Header Principal */}
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Gestión de Contenido</h1>
-          <p className="text-muted-foreground">Agrega nuevo conocimiento al chatbot universitario</p>
+          <h1 className="text-3xl font-bold tracking-tight">Gestión de Contenido</h1>
+          <p className="text-muted-foreground">
+            Administra preguntas, modalidades, submodalidades y categorías
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Form */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="backdrop-blur-sm bg-card/80 border-border/50">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5" />
-                  <span>Nuevo Contenido</span>
-                </CardTitle>
-                <CardDescription>Completa la información para agregar nuevo conocimiento al chatbot</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Question Field */}
-                <div className="space-y-2">
-                  <Label htmlFor="question">Pregunta / Palabra Clave *</Label>
-                  <Input
-                    id="question"
-                    placeholder="Ej: ¿Cuáles son los requisitos para inscripción?"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    className="bg-background/50"
-                    required
-                  />
-                </div>
+        {/* Sección Principal: Preguntas */}
+        <div className="space-y-6">
+          <Card className="border-2 border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Brain className="h-6 w-6 text-primary" />
+                Generación de Preguntas
+              </CardTitle>
+              <CardDescription className="text-base">
+                Función principal: Crea preguntas con contexto y respuestas generadas por IA
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
 
-                {/* Category Selection */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="category">Categoría *</Label>
-                    <div className="flex items-center space-x-1">
-                      <Dialog open={isCreateCategoryOpen} onOpenChange={setIsCreateCategoryOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                            <Plus className="h-3 w-3 mr-1" />
-                            Nueva
-                          </Button>
-                        </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Crear Nueva Categoría</DialogTitle>
-                          <DialogDescription>
-                            Agrega una nueva categoría para organizar mejor el contenido.
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="new-category-name">Nombre *</Label>
-                            <Input
-                              id="new-category-name"
-                              value={newCategoryName}
-                              onChange={(e) => setNewCategoryName(e.target.value)}
-                              placeholder="Nombre de la categoría"
-                              className="bg-background/50"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="new-category-description">Descripción</Label>
-                            <Textarea
-                              id="new-category-description"
-                              value={newCategoryDescription}
-                              onChange={(e) => setNewCategoryDescription(e.target.value)}
-                              placeholder="Descripción opcional"
-                              className="bg-background/50"
-                              rows={2}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="new-category-parent">Categoría Padre (Opcional)</Label>
-                            
-                            {/* Nuevo selector de árbol para el diálogo */}
-                            <div className="relative" ref={createDialogTreeSelectorRef}>
-                              <Button
-                                variant="outline"
-                                onClick={() => setIsCreateDialogTreeSelectorOpen(!isCreateDialogTreeSelectorOpen)}
-                                className="w-full justify-between bg-background/50 h-10"
-                                disabled={treeLoading}
-                              >
-                                <span className="truncate text-left">
-                                  {treeLoading ? "Cargando categorías..." : getCreateDialogSelectedCategoryDisplay()}
-                                </span>
-                                <ChevronDown className="h-4 w-4 opacity-50" />
-                              </Button>
-                              
-                              {isCreateDialogTreeSelectorOpen && (
-                                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto">
-                                  <div className="p-2">
-                                    {/* Opción para sin categoría padre */}
-                                    <div className="py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
-                                      <button
-                                        onClick={() => {
-                                          setNewCategoryParentId("none")
-                                          setCreateDialogSelectedPath([])
-                                          setIsCreateDialogTreeSelectorOpen(false)
-                                        }}
-                                        className="w-full text-left text-sm hover:text-primary"
-                                      >
-                                        Sin categoría padre (Categoría principal)
-                                      </button>
-                                    </div>
-                                    
-                                    {/* Separador */}
-                                    {categoriesTree.length > 0 && (
-                                      <div className="border-t my-1" />
-                                    )}
-                                    
-                                    {/* Árbol de categorías */}
-                                    {categoriesTree.length > 0 ? (
-                                      renderCreateDialogCategoryTree(categoriesTree)
-                                    ) : (
-                                      <div className="text-sm text-muted-foreground p-2">
-                                        No hay categorías disponibles
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button 
-                            variant="outline" 
-                            onClick={() => {
-                              setIsCreateCategoryOpen(false)
-                              setNewCategoryName("")
-                              setNewCategoryDescription("")
-                              setNewCategoryParentId("none")
-                              setCreateDialogSelectedPath([])
-                              setCreateDialogExpandedCategories(new Set())
-                            }}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button 
-                            onClick={handleCreateCategory} 
-                            disabled={!newCategoryName.trim() || isCreatingCategory}
-                          >
-                            {isCreatingCategory ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Creando...
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Crear
-                              </>
-                            )}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                    
-                    {/* Botón para gestionar categorías */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                          <MoreHorizontal className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <div className="p-2">
-                          <div className="text-xs text-muted-foreground mb-2">Seleccionar categoría:</div>
-                          <div className="relative" ref={manageCategorySelectorRef}>
-                            <Button
-                              variant="outline"
-                              onClick={() => setIsManageCategorySelectorOpen(!isManageCategorySelectorOpen)}
-                              className="w-full justify-between h-8 text-xs"
-                              disabled={treeLoading}
-                            >
-                              <span className="truncate">
-                                {selectedCategoryToManage ? selectedCategoryToManage.name : "Seleccionar..."}
-                              </span>
-                              <ChevronDown className="h-3 w-3 opacity-50" />
-                            </Button>
-                            
-                            {isManageCategorySelectorOpen && (
-                              <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-32 overflow-y-auto">
-                                <div className="p-1">
-                                  {categoriesTree.length > 0 ? (
-                                    renderManageCategoryTree(categoriesTree)
-                                  ) : (
-                                    <div className="text-xs text-muted-foreground p-2">
-                                      No hay categorías
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {selectedCategoryToManage && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={openEditCategory}>
-                              <Edit className="h-3 w-3 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                  <Trash2 className="h-3 w-3 mr-2" />
-                                  Eliminar
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta acción no se puede deshacer. Se eliminará permanentemente la categoría "{selectedCategoryToManage.name}".
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction onClick={handleDeleteCategory}>
-                                    Eliminar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    </div>
-                  </div>
-                  {treeError && (
-                    <div className="text-sm text-red-600 dark:text-red-400">
-                      Error al cargar categorías: {treeError}
-                    </div>
-                  )}
-                  
-                  {/* Nuevo selector de árbol */}
-                  <div className="relative" ref={treeSelectorRef}>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsTreeSelectorOpen(!isTreeSelectorOpen)}
-                      className="w-full justify-between bg-background/50 h-10"
-                      disabled={treeLoading}
-                    >
-                      <span className="truncate">
-                        {treeLoading ? "Cargando categorías..." : getSelectedCategoryDisplay()}
-                      </span>
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
-                    
-                    {isTreeSelectorOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-60 overflow-y-auto">
-                        <div className="p-2">
-                          {categoriesTree.length > 0 ? (
-                            renderCategoryTree(categoriesTree)
-                          ) : (
-                            <div className="text-sm text-muted-foreground p-2">
-                              No hay categorías disponibles
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+        {/* Tabs para gestión de estructura */}
+        <Tabs defaultValue="questions" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-muted-foreground">Gestión del Sistema</h2>
+              <p className="text-sm text-muted-foreground">Administra la estructura jerárquica y genera contenido</p>
+            </div>
+            <TabsList className="grid grid-cols-2">
+              <TabsTrigger value="questions" className="flex items-center gap-2">
+                <Brain className="h-4 w-4" />
+                Preguntas
+              </TabsTrigger>
+              <TabsTrigger value="hierarchy" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Estructura Jerárquica
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
-                {/* Diálogo de editar categoría */}
-                <Dialog open={isEditCategoryOpen} onOpenChange={setIsEditCategoryOpen}>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Editar Categoría</DialogTitle>
-                      <DialogDescription>
-                        Modifica los detalles de la categoría seleccionada.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-category-name">Nombre *</Label>
-                        <Input
-                          id="edit-category-name"
-                          value={editCategoryName}
-                          onChange={(e) => setEditCategoryName(e.target.value)}
-                          placeholder="Nombre de la categoría"
-                          className="bg-background/50"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-category-description">Descripción</Label>
-                        <Textarea
-                          id="edit-category-description"
-                          value={editCategoryDescription}
-                          onChange={(e) => setEditCategoryDescription(e.target.value)}
-                          placeholder="Descripción opcional"
-                          className="bg-background/50"
-                          rows={2}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-category-parent">Categoría Padre (Opcional)</Label>
-                        
-                        {/* Selector de árbol para editar categoría */}
-                        <div className="relative" ref={editDialogTreeSelectorRef}>
-                          <Button
-                            variant="outline"
-                            onClick={() => setIsEditDialogTreeSelectorOpen(!isEditDialogTreeSelectorOpen)}
-                            className="w-full justify-between bg-background/50 h-10"
-                            disabled={treeLoading}
-                          >
-                            <span className="truncate text-left">
-                              {treeLoading ? "Cargando categorías..." : getEditDialogSelectedCategoryDisplay()}
-                            </span>
-                            <ChevronDown className="h-4 w-4 opacity-50" />
-                          </Button>
-                          
-                          {isEditDialogTreeSelectorOpen && (
-                            <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto">
-                              <div className="p-2">
-                                {/* Opción para sin categoría padre */}
-                                <div className="py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
-                                  <button
-                                    onClick={() => {
-                                      setEditCategoryParentId("none")
-                                      setEditDialogSelectedPath([])
-                                      setIsEditDialogTreeSelectorOpen(false)
-                                    }}
-                                    className="w-full text-left text-sm hover:text-primary"
-                                  >
-                                    Sin categoría padre (Categoría principal)
-                                  </button>
-                                </div>
-                                
-                                {/* Separador */}
-                                {categoriesTree.length > 0 && (
-                                  <div className="border-t my-1" />
-                                )}
-                                
-                                {/* Árbol de categorías (excluyendo la categoría actual) */}
-                                {categoriesTree.length > 0 ? (
-                                  renderEditDialogCategoryTree(
-                                    categoriesTree.filter(cat => cat.id !== editingCategory?.id)
-                                  )
-                                ) : (
-                                  <div className="text-sm text-muted-foreground p-2">
-                                    No hay categorías disponibles
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id="edit-category-active"
-                            checked={editCategoryIsActive}
-                            onChange={(e) => setEditCategoryIsActive(e.target.checked)}
-                            className="rounded"
-                          />
-                          <Label htmlFor="edit-category-active" className="text-sm">
-                            Categoría activa
-                          </Label>
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button 
-                        variant="outline" 
-                        onClick={() => {
-                          setIsEditCategoryOpen(false)
-                          setEditCategoryName("")
-                          setEditCategoryDescription("")
-                          setEditCategoryParentId("none")
-                          setEditCategoryIsActive(true)
-                          setEditDialogSelectedPath([])
-                          setEditDialogExpandedCategories(new Set())
-                          setEditingCategory(null)
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button 
-                        onClick={handleUpdateCategory} 
-                        disabled={!editCategoryName.trim() || isUpdatingCategory}
-                      >
-                        {isUpdatingCategory ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Actualizando...
-                          </>
-                        ) : (
-                          <>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Actualizar
-                          </>
-                        )}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Context Type Selection */}
-                <div className="space-y-2">
-                  <Label>Tipo de Contexto *</Label>
-                  <div className="flex space-x-4">
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        name="contextType"
-                        value="text"
-                        checked={contextType === "text"}
-                        onChange={() => handleContextTypeChange("text")}
-                        className="text-primary"
-                      />
-                      <span>Texto</span>
-                    </label>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="radio"
-                        name="contextType"
-                        value="pdf"
-                        checked={contextType === "pdf"}
-                        onChange={() => handleContextTypeChange("pdf")}
-                        className="text-primary"
-                      />
-                      <span>PDF</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Context Field */}
-                {contextType === "text" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="context">Contexto Adicional *</Label>
-                    <Textarea
-                      id="context"
-                      placeholder="Proporciona contexto adicional que ayude a generar una mejor respuesta..."
-                      value={context}
-                      onChange={(e) => setContext(e.target.value)}
-                      className="bg-background/50 min-h-[100px]"
-                      rows={4}
-                      required
-                    />
-                  </div>
-                )}
-
-
-
-                {/* File Upload */}
-                {contextType === "pdf" && (
-                  <div className="space-y-2">
-                    <Label>Documento PDF *</Label>
-                    <div
-                      {...getRootProps()}
-                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                        isDragActive
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50 hover:bg-muted/30"
-                      }`}
-                    >
-                      <input {...getInputProps()} />
-                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        {isDragActive
-                          ? "Suelta el archivo aquí..."
-                          : "Arrastra un archivo PDF aquí o haz clic para seleccionar"}
-                      </p>
-                    </div>
-
-                    {/* Uploaded Files */}
-                    {uploadedFiles.length > 0 && (
-                      <div className="space-y-2">
-                        {uploadedFiles.map((file) => (
-                          <div key={file.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <FileText className="h-4 w-4 text-primary" />
-                              <span className="text-sm font-medium">{file.file.name}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {(file.file.size / 1024 / 1024).toFixed(2)} MB
-                              </Badge>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFile(file.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <Separator />
-
-                {/* Generate Response Button */}
-                <div className="flex justify-center">
-                  <Button
-                    onClick={generateResponse}
-                    disabled={!question.trim() || isGenerating || !selectedCategoryId ||
-                      (contextType === "text" && !context.trim()) || 
-                      (contextType === "pdf" && uploadedFiles.length === 0)}
-                    className="bg-primary hover:bg-primary/90"
-                    size="lg"
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generando...
-                      </>
-                    ) : (
-                      <>
-                        <Brain className="h-4 w-4 mr-2" />
-                        Generar Respuesta con IA
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Validation Message */}
-                {question.trim() && (
-                  <div className="text-center">
-                    {!selectedCategoryId && (
-                      <p className="text-sm text-amber-600 dark:text-amber-400 mb-2">
-                        📂 Selecciona una categoría para continuar
-                      </p>
-                    )}
-                    {selectedCategoryId && ((contextType === "text" && !context.trim()) || (contextType === "pdf" && uploadedFiles.length === 0)) && (
-                      <p className="text-sm text-amber-600 dark:text-amber-400">
-                        💡 {contextType === "text" ? "Agrega contexto de texto" : "Sube un archivo PDF"} para generar una respuesta más precisa
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Generation Progress */}
-                {isGenerating && (
-                  <div className="space-y-3">
-                    <Progress value={generationProgress} className="w-full" />
-                    <div className="text-center space-y-1">
-                      <p className="text-sm text-muted-foreground">
-                        Procesando contenido... {Math.round(generationProgress)}%
-                      </p>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        {context.trim() && (
-                          <p>📝 Enviando contexto de texto...</p>
-                        )}
-                        {uploadedFiles.length > 0 && (
-                          <p>📄 Procesando {uploadedFiles.length} archivo(s) PDF...</p>
-                        )}
-                        <p>🤖 Generando respuesta con IA...</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Generated Response Preview */}
-            {showPreview && generatedResponse && (
-              <Card className="backdrop-blur-sm bg-card/80 border-border/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Eye className="h-5 w-5" />
-                    <span>Vista Previa de la Pregunta</span>
-                  </CardTitle>
-                  <CardDescription>Revisa todos los detalles antes de guardar</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Información básica */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-semibold text-primary">Categoría</Label>
-                      <Badge variant="outline" className="mt-1">
-                        {selectedPath.length > 0 
-                          ? selectedPath.map(cat => cat.name).join(" > ")
-                          : "Sin categoría"
-                        }
-                      </Badge>
-                    </div>
-                    
-                    <div>
-                      <Label className="text-sm font-semibold text-primary">Tipo de Contexto</Label>
-                      <Badge 
-                        variant={contextType === "pdf" ? "default" : "secondary"}
-                        className="mt-1"
-                      >
-                        {contextType === "pdf" ? "Documento PDF" : "Texto"}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  {/* Pregunta */}
-                  <div>
-                    <Label className="text-sm font-semibold text-primary">Pregunta</Label>
-                    <div className="mt-2 p-4 bg-muted/30 rounded-lg border">
-                      <p className="text-sm leading-relaxed">{question}</p>
-                    </div>
-                  </div>
-                  
-                  {/* Contexto */}
-                  {contextType === "text" && context.trim() && (
-                    <div>
-                      <Label className="text-sm font-semibold text-primary">Contexto Proporcionado</Label>
-                      <div className="mt-2 p-4 bg-muted/30 rounded-lg border max-h-32 overflow-y-auto">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{context}</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Archivos PDF */}
-                  {contextType === "pdf" && uploadedFiles.length > 0 && (
-                    <div>
-                      <Label className="text-sm font-semibold text-primary">Archivos PDF</Label>
-                      <div className="mt-2 space-y-2">
-                        {uploadedFiles.map((file) => (
-                          <div key={file.id} className="flex items-center space-x-3 p-3 bg-muted/30 rounded-lg border">
-                            <FileText className="h-5 w-5 text-blue-600" />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium">{file.file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {(file.file.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Respuesta generada */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="text-sm font-semibold text-primary">Respuesta Generada por IA</Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsEditingResponse(!isEditingResponse)}
-                        className="text-xs"
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        {isEditingResponse ? "Vista previa" : "Editar"}
-                      </Button>
-                    </div>
-                    
-                    {isEditingResponse ? (
+          {/* Tab Content: Preguntas */}
+          <TabsContent value="questions" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Main Form */}
+              <div className="lg:col-span-2 space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="h-5 w-5" />
+                      Generar Nueva Pregunta
+                    </CardTitle>
+                    <CardDescription>
+                      Crea preguntas con contexto y respuestas generadas por IA
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Question Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="question">Pregunta *</Label>
                       <Textarea
-                        value={editableModelResponse}
-                        onChange={(e) => setEditableModelResponse(e.target.value)}
-                        className="min-h-32 text-sm"
-                        placeholder="Edita la respuesta generada por IA..."
+                        id="question"
+                        placeholder="¿Cuál es tu pregunta?"
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        rows={3}
+                        className="resize-none"
                       />
-                    ) : (
-                      <div className="mt-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <p className="text-sm leading-relaxed whitespace-pre-line">{editableModelResponse}</p>
+                    </div>
+
+                    {/* Hierarchical Selection */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Modalidad */}
+                      <div className="space-y-2">
+                        <Label>Modalidad *</Label>
+                        <Select value={selectedModalityId} onValueChange={setSelectedModalityId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona modalidad" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {modalities?.map((modality) => (
+                              <SelectItem key={modality.id} value={modality.id}>
+                                {modality.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Submodalidad */}
+                      <div className="space-y-2">
+                        <Label>Submodalidad (Opcional)</Label>
+                        <Select 
+                          value={selectedSubmodalityId} 
+                          onValueChange={setSelectedSubmodalityId}
+                          disabled={!selectedModalityId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona submodalidad" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {submodalitiesByModality?.map((submodality) => (
+                              <SelectItem key={submodality.id} value={submodality.id}>
+                                {submodality.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Categoría */}
+                      <div className="space-y-2">
+                        <Label>Categoría (Opcional)</Label>
+                        <Select 
+                          value={selectedCategoryId} 
+                          onValueChange={setSelectedCategoryId}
+                          disabled={!selectedSubmodalityId}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona categoría" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categoriesBySubmodality?.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Context Type Selection */}
+                    <div className="space-y-2">
+                      <Label>Tipo de Contexto</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={contextType === "text" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            setContextType("text")
+                            setUploadedFiles([])
+                          }}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Texto
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={contextType === "pdf" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            setContextType("pdf")
+                            setContext("")
+                          }}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          PDF
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Context Field */}
+                    {contextType === "text" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="context">Contexto *</Label>
+                        <Textarea
+                          id="context"
+                          placeholder="Proporciona el contexto para la pregunta..."
+                          value={context}
+                          onChange={(e) => setContext(e.target.value)}
+                          rows={6}
+                        />
                       </div>
                     )}
-                  </div>
-                  
-                  {/* Botones de acción */}
-                  <div className="flex justify-end space-x-3 pt-4 border-t">
-                    <Button variant="outline" onClick={() => setShowPreview(false)}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </Button>
-                    <Button onClick={saveContent} className="bg-secondary hover:bg-secondary/90">
-                      <Save className="h-4 w-4 mr-2" />
-                      Guardar Contenido
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Tips Card */}
-            <Card className="backdrop-blur-sm bg-card/80 border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg">Consejos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="h-5 w-5 text-secondary mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Preguntas Claras</p>
-                    <p className="text-xs text-muted-foreground">Formula preguntas específicas y directas</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="h-5 w-5 text-secondary mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Contexto Relevante</p>
-                    <p className="text-xs text-muted-foreground">Proporciona información adicional útil</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <CheckCircle className="h-5 w-5 text-secondary mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">Tags Descriptivos</p>
-                    <p className="text-xs text-muted-foreground">Usa etiquetas que faciliten la búsqueda</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                    {/* File Upload */}
+                    {contextType === "pdf" && (
+                      <div className="space-y-4">
+                        <div
+                          {...getRootProps()}
+                          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                            isDragActive
+                              ? "border-primary bg-primary/5"
+                              : "border-muted-foreground/25 hover:border-primary/50"
+                          }`}
+                        >
+                          <input {...getInputProps()} />
+                          <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            {isDragActive
+                              ? "Suelta los archivos PDF aquí..."
+                              : "Arrastra archivos PDF aquí o haz clic para seleccionar"}
+                          </p>
+                        </div>
 
-            {/* Status Card */}
-            <Card className="backdrop-blur-sm bg-card/80 border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg">Estado del Sistema</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">IA Disponible</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-secondary rounded-full" />
-                    <span className="text-xs text-secondary">Activo</span>
-                  </div>
+                        {/* Uploaded Files */}
+                        {uploadedFiles.length > 0 && (
+                          <div className="space-y-2">
+                            <Label>Archivos subidos:</Label>
+                            <div className="space-y-2">
+                              {uploadedFiles.map((uploadedFile) => (
+                                <div
+                                  key={uploadedFile.id}
+                                  className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    <span className="text-sm">{uploadedFile.preview}</span>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeFile(uploadedFile.id)}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Generate Response Button */}
+                    <Button
+                      onClick={handleGenerateResponse}
+                      disabled={isGenerating}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generando...
+                        </>
+                      ) : (
+                        <>
+                          <Brain className="h-4 w-4 mr-2" />
+                          Generar Respuesta
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Validation Message */}
+                    {!selectedModalityId && (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          <strong>Nota:</strong> Debes seleccionar al menos una modalidad para generar la pregunta.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Generation Progress */}
+                    {isGenerating && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Generando respuesta...</span>
+                          <span>{generationProgress}%</span>
+                        </div>
+                        <Progress value={generationProgress} className="w-full" />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Generated Response Preview */}
+                {showPreview && generatedResponse && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Eye className="h-5 w-5" />
+                        Vista Previa de la Respuesta
+                      </CardTitle>
+                      <CardDescription>
+                        Revisa y edita la respuesta antes de guardar
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Información básica */}
+                      <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">MODALIDAD</Label>
+                          <p className="text-sm font-medium">
+                            {modalities?.find(m => m.id === selectedModalityId)?.name || "No especificada"}
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">SUBMODALIDAD</Label>
+                          <p className="text-sm font-medium">
+                            {selectedSubmodalityId 
+                              ? submodalitiesByModality?.find(s => s.id === selectedSubmodalityId)?.name || "No especificada"
+                              : "No especificada"
+                            }
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">CATEGORÍA</Label>
+                          <p className="text-sm font-medium">
+                            {selectedCategoryId 
+                              ? categoriesBySubmodality?.find(c => c.id === selectedCategoryId)?.name || "No especificada"
+                              : "No especificada"
+                            }
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">TIPO DE CONTEXTO</Label>
+                          <p className="text-sm font-medium">{contextType === "text" ? "Texto" : "PDF"}</p>
+                        </div>
+                      </div>
+
+                      {/* Pregunta */}
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">PREGUNTA</Label>
+                        <p className="text-sm mt-1 p-3 bg-background border rounded-md">{question}</p>
+                      </div>
+
+                      {/* Contexto */}
+                      <div>
+                        <Label className="text-sm font-medium text-muted-foreground">CONTEXTO</Label>
+                        {contextType === "text" ? (
+                          <p className="text-sm mt-1 p-3 bg-background border rounded-md whitespace-pre-wrap">
+                            {context}
+                          </p>
+                        ) : (
+                          <div className="mt-1 p-3 bg-background border rounded-md">
+                            {uploadedFiles.map((file) => (
+                              <div key={file.id} className="flex items-center gap-2 text-sm">
+                                <FileText className="h-4 w-4" />
+                                {file.preview}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Respuesta generada */}
+                      <div>
+                        <Label htmlFor="editableResponse" className="text-sm font-medium text-muted-foreground">
+                          RESPUESTA GENERADA
+                        </Label>
+                        <Textarea
+                          id="editableResponse"
+                          value={editableModelResponse}
+                          onChange={(e) => setEditableModelResponse(e.target.value)}
+                          rows={10}
+                          className="mt-1 font-mono text-sm"
+                        />
+                      </div>
+
+                      {/* Botones de acción */}
+                      <div className="flex gap-2">
+                        <Button onClick={handleUpdateResponse} className="flex-1">
+                          <Save className="h-4 w-4 mr-2" />
+                          Guardar Respuesta
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowPreview(false)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-6">
+                {/* Tips Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">💡 Consejos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="space-y-2">
+                      <p><strong>Jerarquía:</strong></p>
+                      <p className="text-muted-foreground">
+                        Modalidad → Submodalidad → Categoría
+                      </p>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      <p><strong>Preguntas efectivas:</strong></p>
+                      <ul className="text-muted-foreground space-y-1">
+                        <li>• Sé específico y claro</li>
+                        <li>• Proporciona contexto relevante</li>
+                        <li>• Usa la jerarquía correcta</li>
+                      </ul>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      <p><strong>Contexto PDF:</strong></p>
+                      <p className="text-muted-foreground">
+                        Los archivos PDF se procesarán automáticamente para extraer el texto relevante.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Status Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      Estado del Sistema
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span>Modalidades:</span>
+                      <Badge variant="secondary">{modalities?.length || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Submodalidades:</span>
+                      <Badge variant="secondary">{submodalities?.length || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Categorías:</span>
+                      <Badge variant="secondary">{newCategories?.length || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Preguntas:</span>
+                      <Badge variant="secondary">{questions?.length || 0}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Tab Content: Estructura Jerárquica */}
+          <TabsContent value="hierarchy" className="space-y-8">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold">Estructura Jerárquica</h2>
+              <p className="text-muted-foreground">Gestiona modalidades, submodalidades y categorías en orden ascendente</p>
+            </div>
+
+            {/* Modalidades */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold">Modalidades</h3>
+                  <Badge variant="secondary">{modalities?.length || 0}</Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Procesamiento</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-secondary rounded-full" />
-                    <span className="text-xs text-secondary">Normal</span>
-                  </div>
+                <Button onClick={() => setIsCreateModalityOpen(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Modalidad
+                </Button>
+              </div>
+
+              {modalitiesLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Base de Datos</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-secondary rounded-full" />
-                    <span className="text-xs text-secondary">Conectada</span>
-                  </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {modalities?.map((modality) => (
+                    <Card key={modality.id} className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="space-y-2">
+                            <div>
+                              <span className="text-sm font-medium text-muted-foreground">Modalidad:</span>
+                              <h4 className="font-semibold text-base mt-1">{modality.name}</h4>
+                            </div>
+                            {modality.description && (
+                              <div>
+                                <span className="text-sm font-medium text-muted-foreground">Descripción:</span>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {modality.description}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            <Badge variant="outline" className="text-xs">
+                              {modality.total_submodalities} submodalidades
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {modality.total_categories} categorías
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {modality.total_questions} preguntas
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 ml-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditModality(modality)}
+                            className="h-8 w-8 p-0"
+                            title="Editar modalidad"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteModality(modality.id)}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            title="Eliminar modalidad"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              )}
+            </div>
+
+            {/* Submodalidades */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-green-600" />
+                  <h3 className="text-lg font-semibold">Submodalidades</h3>
+                  <Badge variant="secondary">{submodalities?.length || 0}</Badge>
+                </div>
+                <Button onClick={() => setIsCreateSubmodalityOpen(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Submodalidad
+                </Button>
+              </div>
+
+              {submodalitiesLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {submodalities?.map((submodality) => (
+                    <Card key={submodality.id} className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="space-y-2">
+                            <div>
+                              <span className="text-sm font-medium text-muted-foreground">Modalidad:</span>
+                              <p className="text-sm text-blue-600 font-medium mt-1">{submodality.modality_name}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-muted-foreground">Submodalidad:</span>
+                              <h4 className="font-semibold text-base mt-1">{submodality.name}</h4>
+                            </div>
+                            {submodality.description && (
+                              <div>
+                                <span className="text-sm font-medium text-muted-foreground">Descripción:</span>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {submodality.description}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            <Badge variant="outline" className="text-xs">
+                              {submodality.total_categories} categorías
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {submodality.total_questions} preguntas
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 ml-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditSubmodality(submodality)}
+                            className="h-8 w-8 p-0"
+                            title="Editar submodalidad"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteSubmodality(submodality.id)}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            title="Eliminar submodalidad"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Categorías */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-purple-600" />
+                  <h3 className="text-lg font-semibold">Categorías</h3>
+                  <Badge variant="secondary">{newCategories?.length || 0}</Badge>
+                </div>
+                <Button onClick={() => setIsCreateNewCategoryOpen(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Categoría
+                </Button>
+              </div>
+
+              {newCategoriesLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {newCategories?.map((category: NewCategory) => (
+                    <Card key={category.id} className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="space-y-2">
+                            <div>
+                              <span className="text-sm font-medium text-muted-foreground">Modalidad:</span>
+                              <p className="text-sm text-blue-600 font-medium mt-1">{category.modality_name}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-muted-foreground">Submodalidad:</span>
+                              <p className="text-sm text-green-600 font-medium mt-1">{category.submodality_name}</p>
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-muted-foreground">Categoría:</span>
+                              <h4 className="font-semibold text-base mt-1">{category.name}</h4>
+                            </div>
+                            {category.description && (
+                              <div>
+                                <span className="text-sm font-medium text-muted-foreground">Descripción:</span>
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {category.description}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            <Badge variant="outline" className="text-xs">
+                              {category.total_questions} preguntas
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 ml-3">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditNewCategory(category)}
+                            className="h-8 w-8 p-0"
+                            title="Editar categoría"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteNewCategory(category.id)}
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                            title="Eliminar categoría"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {/* Dialogs */}
+        {/* Create Modality Dialog */}
+        <Dialog open={isCreateModalityOpen} onOpenChange={setIsCreateModalityOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crear Nueva Modalidad</DialogTitle>
+              <DialogDescription>
+                Agrega una nueva modalidad al sistema
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="modalityName">Nombre *</Label>
+                <Input
+                  id="modalityName"
+                  value={newModalityName}
+                  onChange={(e) => setNewModalityName(e.target.value)}
+                  placeholder="Nombre de la modalidad"
+                />
+              </div>
+              <div>
+                <Label htmlFor="modalityDescription">Descripción</Label>
+                <Textarea
+                  id="modalityDescription"
+                  value={newModalityDescription}
+                  onChange={(e) => setNewModalityDescription(e.target.value)}
+                  placeholder="Descripción de la modalidad"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsCreateModalityOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleCreateModality}
+                disabled={isSubmittingModality}
+              >
+                {isSubmittingModality ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  "Crear Modalidad"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Modality Dialog */}
+        <Dialog open={isEditModalityOpen} onOpenChange={setIsEditModalityOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Modalidad</DialogTitle>
+              <DialogDescription>
+                Modifica los datos de la modalidad
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editModalityName">Nombre *</Label>
+                <Input
+                  id="editModalityName"
+                  value={newModalityName}
+                  onChange={(e) => setNewModalityName(e.target.value)}
+                  placeholder="Nombre de la modalidad"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editModalityDescription">Descripción</Label>
+                <Textarea
+                  id="editModalityDescription"
+                  value={newModalityDescription}
+                  onChange={(e) => setNewModalityDescription(e.target.value)}
+                  placeholder="Descripción de la modalidad"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditModalityOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleEditModality}
+                disabled={isSubmittingModality}
+              >
+                {isSubmittingModality ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  "Actualizar Modalidad"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Submodality Dialog */}
+        <Dialog open={isCreateSubmodalityOpen} onOpenChange={setIsCreateSubmodalityOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crear Nueva Submodalidad</DialogTitle>
+              <DialogDescription>
+                Agrega una nueva submodalidad al sistema
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="submodalityModality">Modalidad Padre *</Label>
+                <Select value={newSubmodalityModalityId} onValueChange={setNewSubmodalityModalityId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona modalidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {modalities?.map((modality) => (
+                      <SelectItem key={modality.id} value={modality.id}>
+                        {modality.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="submodalityName">Nombre *</Label>
+                <Input
+                  id="submodalityName"
+                  value={newSubmodalityName}
+                  onChange={(e) => setNewSubmodalityName(e.target.value)}
+                  placeholder="Nombre de la submodalidad"
+                />
+              </div>
+              <div>
+                <Label htmlFor="submodalityDescription">Descripción</Label>
+                <Textarea
+                  id="submodalityDescription"
+                  value={newSubmodalityDescription}
+                  onChange={(e) => setNewSubmodalityDescription(e.target.value)}
+                  placeholder="Descripción de la submodalidad"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsCreateSubmodalityOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleCreateSubmodality}
+                disabled={isSubmittingSubmodality}
+              >
+                {isSubmittingSubmodality ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  "Crear Submodalidad"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Submodality Dialog */}
+        <Dialog open={isEditSubmodalityOpen} onOpenChange={setIsEditSubmodalityOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Submodalidad</DialogTitle>
+              <DialogDescription>
+                Modifica los datos de la submodalidad
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editSubmodalityModality">Modalidad Padre *</Label>
+                <Select value={newSubmodalityModalityId} onValueChange={setNewSubmodalityModalityId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona modalidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {modalities?.map((modality) => (
+                      <SelectItem key={modality.id} value={modality.id}>
+                        {modality.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="editSubmodalityName">Nombre *</Label>
+                <Input
+                  id="editSubmodalityName"
+                  value={newSubmodalityName}
+                  onChange={(e) => setNewSubmodalityName(e.target.value)}
+                  placeholder="Nombre de la submodalidad"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editSubmodalityDescription">Descripción</Label>
+                <Textarea
+                  id="editSubmodalityDescription"
+                  value={newSubmodalityDescription}
+                  onChange={(e) => setNewSubmodalityDescription(e.target.value)}
+                  placeholder="Descripción de la submodalidad"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditSubmodalityOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleEditSubmodality}
+                disabled={isSubmittingSubmodality}
+              >
+                {isSubmittingSubmodality ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  "Actualizar Submodalidad"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Category Dialog */}
+        <Dialog open={isCreateNewCategoryOpen} onOpenChange={setIsCreateNewCategoryOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crear Nueva Categoría</DialogTitle>
+              <DialogDescription>
+                Agrega una nueva categoría al sistema
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="categorySubmodality">Submodalidad Padre *</Label>
+                <Select value={newCategorySubmodalityId} onValueChange={setNewCategorySubmodalityId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona submodalidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {submodalities?.map((submodality) => (
+                      <SelectItem key={submodality.id} value={submodality.id}>
+                        {submodality.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="categoryName">Nombre *</Label>
+                <Input
+                  id="categoryName"
+                  value={newCategoryHierName}
+                  onChange={(e) => setNewCategoryHierName(e.target.value)}
+                  placeholder="Nombre de la categoría"
+                />
+              </div>
+              <div>
+                <Label htmlFor="categoryDescription">Descripción</Label>
+                <Textarea
+                  id="categoryDescription"
+                  value={newCategoryHierDescription}
+                  onChange={(e) => setNewCategoryHierDescription(e.target.value)}
+                  placeholder="Descripción de la categoría"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsCreateNewCategoryOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleCreateNewCategory}
+                disabled={isSubmittingNewCategory}
+              >
+                {isSubmittingNewCategory ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  "Crear Categoría"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Category Dialog */}
+        <Dialog open={isEditNewCategoryOpen} onOpenChange={setIsEditNewCategoryOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Categoría</DialogTitle>
+              <DialogDescription>
+                Modifica los datos de la categoría
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editCategorySubmodality">Submodalidad Padre *</Label>
+                <Select value={newCategorySubmodalityId} onValueChange={setNewCategorySubmodalityId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona submodalidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {submodalities?.map((submodality) => (
+                      <SelectItem key={submodality.id} value={submodality.id}>
+                        {submodality.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="editCategoryName">Nombre *</Label>
+                <Input
+                  id="editCategoryName"
+                  value={newCategoryHierName}
+                  onChange={(e) => setNewCategoryHierName(e.target.value)}
+                  placeholder="Nombre de la categoría"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editCategoryDescription">Descripción</Label>
+                <Textarea
+                  id="editCategoryDescription"
+                  value={newCategoryHierDescription}
+                  onChange={(e) => setNewCategoryHierDescription(e.target.value)}
+                  placeholder="Descripción de la categoría"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsEditNewCategoryOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleEditNewCategory}
+                disabled={isSubmittingNewCategory}
+              >
+                {isSubmittingNewCategory ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  "Actualizar Categoría"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   )

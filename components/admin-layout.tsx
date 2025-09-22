@@ -21,6 +21,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useCallback } from "react"
 import { authService } from "@/lib/auth"
+import { useAuthState } from "@/hooks/use-auth-state"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -36,29 +37,23 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
+  const { isAuthenticated, isLoading } = useAuthState()
 
-  // Verificar autenticación al cargar el componente
+  // Redirigir si no está autenticado
   useEffect(() => {
-    const checkAuth = () => {
-      if (!authService.isAuthenticated()) {
-        router.push("/login")
-        return
-      }
-      setIsAuthenticated(true)
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login")
     }
-
-    checkAuth()
-  }, [router])
+  }, [isAuthenticated, isLoading, router])
 
   const handleLogout = useCallback(() => {
     authService.logout()
   }, [])
 
-  // No renderizar nada hasta verificar la autenticación
-  if (!isAuthenticated) {
+  // Mostrar loading mientras se verifica la autenticación
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -67,6 +62,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       </div>
     )
+  }
+
+  // Si no está autenticado, no renderizar nada (se redirigirá)
+  if (!isAuthenticated) {
+    return null
   }
 
   return (
