@@ -58,11 +58,11 @@ export function getTokenTimeToExpiry(token: string): number {
 
 /**
  * Verifica si un token necesita ser refrescado
- * (si expira en menos de 5 minutos)
+ * (si expira en menos de 15 minutos)
  */
 export function shouldRefreshToken(token: string): boolean {
   const timeToExpiry = getTokenTimeToExpiry(token)
-  const fiveMinutes = 5 * 60 * 1000 // 5 minutos en milisegundos
-  
-  return timeToExpiry < fiveMinutes && timeToExpiry > 0
+  const fifteenMinutes = 15 * 60 * 1000 // 15 minutos en milisegundos
+
+  return timeToExpiry < fifteenMinutes && timeToExpiry > 0
 }

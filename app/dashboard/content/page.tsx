@@ -319,20 +319,19 @@ export default function ContentPage() {
   // Funciones para manejo de archivos
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (contextType !== "pdf") return
-    
+
     setUploadedFiles([])
-    
-    acceptedFiles.forEach((file) => {
-      if (file.type === "application/pdf") {
-        const uploadedFile: UploadedFile = {
-          file,
-          preview: file.name,
-          id: Math.random().toString(36).substr(2, 9)
-        }
-        setUploadedFiles(prev => [...prev, uploadedFile])
+
+    if (acceptedFiles.length > 0 && acceptedFiles[0].type === "application/pdf") {
+      const file = acceptedFiles[0]
+      const uploadedFile: UploadedFile = {
+        file,
+        preview: file.name,
+        id: Math.random().toString(36).substr(2, 9)
       }
-    })
-    
+      setUploadedFiles([uploadedFile])
+    }
+
     if (acceptedFiles.length > 0 && contextType !== "pdf") {
       setContextType("pdf")
       setContext("")
@@ -344,7 +343,7 @@ export default function ContentPage() {
     accept: {
       'application/pdf': ['.pdf']
     },
-    multiple: true
+    multiple: false
   })
 
   const removeFile = (id: string) => {
@@ -362,7 +361,7 @@ export default function ContentPage() {
       return
     }
     if (contextType === "pdf" && uploadedFiles.length === 0) {
-      alert('Debes subir al menos un archivo PDF')
+      alert('Debes subir un archivo PDF')
       return
     }
     if (!selectedModalityId) {
@@ -391,9 +390,7 @@ export default function ContentPage() {
       if (contextType === "text") {
         formData.append('context_text', context)
       } else if (contextType === "pdf" && uploadedFiles.length > 0) {
-        uploadedFiles.forEach((uploadedFile) => {
-          formData.append('context_files', uploadedFile.file)
-        })
+        formData.append('context_file', uploadedFiles[0].file)
       }
 
       const progressInterval = setInterval(() => {
@@ -440,14 +437,12 @@ export default function ContentPage() {
     }
 
     try {
+      const formData = new FormData()
+      formData.append('model_response', editableModelResponse)
+
       const response = await fetchData(buildApiUrl(`${API_CONFIG.ENDPOINTS.QUESTIONS_NO_SLASH}/${currentQuestionId}`), {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          response: editableModelResponse
-        })
+        body: formData
       })
 
       setQuestion("")
@@ -485,13 +480,13 @@ export default function ContentPage() {
 
         {/* Sección Principal: Preguntas */}
         <div className="space-y-6">
-          <Card className="border-2 border-primary/20 bg-primary/5">
+          <Card className="border-2 border-red-200 bg-red-50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Brain className="h-6 w-6 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-xl text-black">
+                <Brain className="h-6 w-6 text-red-600" />
                 Generación de Preguntas
               </CardTitle>
-              <CardDescription className="text-base">
+              <CardDescription className="text-base text-gray-700">
                 Función principal: Crea preguntas con contexto y respuestas generadas por IA
               </CardDescription>
             </CardHeader>
@@ -522,13 +517,13 @@ export default function ContentPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               {/* Main Form */}
               <div className="lg:col-span-2 space-y-6">
-                <Card>
+                <Card className="bg-white border-gray-200">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Brain className="h-5 w-5" />
+                    <CardTitle className="flex items-center gap-2 text-black">
+                      <Brain className="h-5 w-5 text-red-600" />
                       Generar Nueva Pregunta
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-gray-600">
                       Crea preguntas con contexto y respuestas generadas por IA
                     </CardDescription>
                   </CardHeader>
@@ -542,7 +537,7 @@ export default function ContentPage() {
                         value={question}
                         onChange={(e) => setQuestion(e.target.value)}
                         rows={3}
-                        className="resize-none"
+                        className="resize-none bg-gray-100 border-gray-300"
                       />
                     </div>
 
@@ -552,7 +547,7 @@ export default function ContentPage() {
                       <div className="space-y-2">
                         <Label>Modalidad *</Label>
                         <Select value={selectedModalityId} onValueChange={setSelectedModalityId}>
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-gray-100 border-gray-300">
                             <SelectValue placeholder="Selecciona modalidad" />
                           </SelectTrigger>
                           <SelectContent>
@@ -568,12 +563,12 @@ export default function ContentPage() {
                       {/* Submodalidad */}
                       <div className="space-y-2">
                         <Label>Submodalidad (Opcional)</Label>
-                        <Select 
-                          value={selectedSubmodalityId} 
+                        <Select
+                          value={selectedSubmodalityId}
                           onValueChange={setSelectedSubmodalityId}
                           disabled={!selectedModalityId}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-gray-100 border-gray-300">
                             <SelectValue placeholder="Selecciona submodalidad" />
                           </SelectTrigger>
                           <SelectContent>
@@ -589,12 +584,12 @@ export default function ContentPage() {
                       {/* Categoría */}
                       <div className="space-y-2">
                         <Label>Categoría (Opcional)</Label>
-                        <Select 
-                          value={selectedCategoryId} 
+                        <Select
+                          value={selectedCategoryId}
                           onValueChange={setSelectedCategoryId}
                           disabled={!selectedSubmodalityId}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-gray-100 border-gray-300">
                             <SelectValue placeholder="Selecciona categoría" />
                           </SelectTrigger>
                           <SelectContent>
@@ -614,7 +609,11 @@ export default function ContentPage() {
                       <div className="flex gap-2">
                         <Button
                           type="button"
-                          variant={contextType === "text" ? "default" : "outline"}
+                          className={`${
+                            contextType === "text"
+                              ? "bg-red-200 text-red-800 border-red-300 hover:bg-red-300"
+                              : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-red-100 hover:text-red-700"
+                          } border`}
                           size="sm"
                           onClick={() => {
                             setContextType("text")
@@ -626,7 +625,11 @@ export default function ContentPage() {
                         </Button>
                         <Button
                           type="button"
-                          variant={contextType === "pdf" ? "default" : "outline"}
+                          className={`${
+                            contextType === "pdf"
+                              ? "bg-red-200 text-red-800 border-red-300 hover:bg-red-300"
+                              : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-red-100 hover:text-red-700"
+                          } border`}
                           size="sm"
                           onClick={() => {
                             setContextType("pdf")
@@ -649,6 +652,7 @@ export default function ContentPage() {
                           value={context}
                           onChange={(e) => setContext(e.target.value)}
                           rows={6}
+                          className="bg-gray-100 border-gray-300"
                         />
                       </div>
                     )}
@@ -668,15 +672,15 @@ export default function ContentPage() {
                           <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
                           <p className="text-sm text-muted-foreground">
                             {isDragActive
-                              ? "Suelta los archivos PDF aquí..."
-                              : "Arrastra archivos PDF aquí o haz clic para seleccionar"}
+                              ? "Suelta el archivo PDF aquí..."
+                              : "Arrastra un archivo PDF aquí o haz clic para seleccionar"}
                           </p>
                         </div>
 
                         {/* Uploaded Files */}
                         {uploadedFiles.length > 0 && (
                           <div className="space-y-2">
-                            <Label>Archivos subidos:</Label>
+                            <Label>Archivo subido:</Label>
                             <div className="space-y-2">
                               {uploadedFiles.map((uploadedFile) => (
                                 <div
@@ -707,7 +711,7 @@ export default function ContentPage() {
                     <Button
                       onClick={handleGenerateResponse}
                       disabled={isGenerating}
-                      className="w-full"
+                      className="w-full bg-red-600 hover:bg-red-700 text-white"
                       size="lg"
                     >
                       {isGenerating ? (
@@ -747,13 +751,13 @@ export default function ContentPage() {
 
                 {/* Generated Response Preview */}
                 {showPreview && generatedResponse && (
-                  <Card>
+                  <Card className="bg-white border-gray-200">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Eye className="h-5 w-5" />
+                      <CardTitle className="flex items-center gap-2 text-black">
+                        <Eye className="h-5 w-5 text-red-600" />
                         Vista Previa de la Respuesta
                       </CardTitle>
-                      <CardDescription>
+                      <CardDescription className="text-gray-600">
                         Revisa y edita la respuesta antes de guardar
                       </CardDescription>
                     </CardHeader>
@@ -825,19 +829,20 @@ export default function ContentPage() {
                           value={editableModelResponse}
                           onChange={(e) => setEditableModelResponse(e.target.value)}
                           rows={10}
-                          className="mt-1 font-mono text-sm"
+                          className="mt-1 font-mono text-sm focus:ring-black focus:border-black"
                         />
                       </div>
 
                       {/* Botones de acción */}
                       <div className="flex gap-2">
-                        <Button onClick={handleUpdateResponse} className="flex-1">
+                        <Button onClick={handleUpdateResponse} className="flex-1 bg-red-600 hover:bg-red-700">
                           <Save className="h-4 w-4 mr-2" />
                           Guardar Respuesta
                         </Button>
                         <Button
                           variant="outline"
                           onClick={() => setShowPreview(false)}
+                          className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
                         >
                           Cancelar
                         </Button>
@@ -874,7 +879,7 @@ export default function ContentPage() {
                     <div className="space-y-2">
                       <p><strong>Contexto PDF:</strong></p>
                       <p className="text-muted-foreground">
-                        Los archivos PDF se procesarán automáticamente para extraer el texto relevante.
+                        El archivo PDF se procesará automáticamente para extraer el texto relevante.
                       </p>
                     </div>
                   </CardContent>
@@ -926,7 +931,7 @@ export default function ContentPage() {
                   <h3 className="text-lg font-semibold">Modalidades</h3>
                   <Badge variant="secondary">{modalities?.length || 0}</Badge>
                 </div>
-                <Button onClick={() => setIsCreateModalityOpen(true)} size="sm">
+                <Button onClick={() => setIsCreateModalityOpen(true)} size="sm" className="bg-red-200 text-red-800 border-red-300 hover:bg-red-300">
                   <Plus className="h-4 w-4 mr-2" />
                   Nueva Modalidad
                 </Button>
@@ -1003,7 +1008,7 @@ export default function ContentPage() {
                   <h3 className="text-lg font-semibold">Submodalidades</h3>
                   <Badge variant="secondary">{submodalities?.length || 0}</Badge>
                 </div>
-                <Button onClick={() => setIsCreateSubmodalityOpen(true)} size="sm">
+                <Button onClick={() => setIsCreateSubmodalityOpen(true)} size="sm" className="bg-red-200 text-red-800 border-red-300 hover:bg-red-300">
                   <Plus className="h-4 w-4 mr-2" />
                   Nueva Submodalidad
                 </Button>
@@ -1081,7 +1086,7 @@ export default function ContentPage() {
                   <h3 className="text-lg font-semibold">Categorías</h3>
                   <Badge variant="secondary">{newCategories?.length || 0}</Badge>
                 </div>
-                <Button onClick={() => setIsCreateNewCategoryOpen(true)} size="sm">
+                <Button onClick={() => setIsCreateNewCategoryOpen(true)} size="sm" className="bg-red-200 text-red-800 border-red-300 hover:bg-red-300">
                   <Plus className="h-4 w-4 mr-2" />
                   Nueva Categoría
                 </Button>
@@ -1157,31 +1162,33 @@ export default function ContentPage() {
         {/* Dialogs */}
         {/* Create Modality Dialog */}
         <Dialog open={isCreateModalityOpen} onOpenChange={setIsCreateModalityOpen}>
-          <DialogContent>
+          <DialogContent className="bg-white border-red-200">
             <DialogHeader>
-              <DialogTitle>Crear Nueva Modalidad</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-black">Crear Nueva Modalidad</DialogTitle>
+              <DialogDescription className="text-gray-600">
                 Agrega una nueva modalidad al sistema
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="modalityName">Nombre *</Label>
+                <Label htmlFor="modalityName" className="text-black">Nombre *</Label>
                 <Input
                   id="modalityName"
                   value={newModalityName}
                   onChange={(e) => setNewModalityName(e.target.value)}
                   placeholder="Nombre de la modalidad"
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
               <div>
-                <Label htmlFor="modalityDescription">Descripción</Label>
+                <Label htmlFor="modalityDescription" className="text-black">Descripción</Label>
                 <Textarea
                   id="modalityDescription"
                   value={newModalityDescription}
                   onChange={(e) => setNewModalityDescription(e.target.value)}
                   placeholder="Descripción de la modalidad"
                   rows={3}
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
             </div>
@@ -1189,12 +1196,14 @@ export default function ContentPage() {
               <Button
                 variant="outline"
                 onClick={() => setIsCreateModalityOpen(false)}
+                className="border-red-300 text-black hover:bg-red-50"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleCreateModality}
                 disabled={isSubmittingModality}
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 {isSubmittingModality ? (
                   <>
@@ -1211,31 +1220,33 @@ export default function ContentPage() {
 
         {/* Edit Modality Dialog */}
         <Dialog open={isEditModalityOpen} onOpenChange={setIsEditModalityOpen}>
-          <DialogContent>
+          <DialogContent className="bg-white border-red-200">
             <DialogHeader>
-              <DialogTitle>Editar Modalidad</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-black">Editar Modalidad</DialogTitle>
+              <DialogDescription className="text-gray-600">
                 Modifica los datos de la modalidad
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="editModalityName">Nombre *</Label>
+                <Label htmlFor="editModalityName" className="text-black">Nombre *</Label>
                 <Input
                   id="editModalityName"
                   value={newModalityName}
                   onChange={(e) => setNewModalityName(e.target.value)}
                   placeholder="Nombre de la modalidad"
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
               <div>
-                <Label htmlFor="editModalityDescription">Descripción</Label>
+                <Label htmlFor="editModalityDescription" className="text-black">Descripción</Label>
                 <Textarea
                   id="editModalityDescription"
                   value={newModalityDescription}
                   onChange={(e) => setNewModalityDescription(e.target.value)}
                   placeholder="Descripción de la modalidad"
                   rows={3}
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
             </div>
@@ -1243,12 +1254,14 @@ export default function ContentPage() {
               <Button
                 variant="outline"
                 onClick={() => setIsEditModalityOpen(false)}
+                className="border-red-300 text-black hover:bg-red-50"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleEditModality}
                 disabled={isSubmittingModality}
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 {isSubmittingModality ? (
                   <>
@@ -1265,18 +1278,18 @@ export default function ContentPage() {
 
         {/* Create Submodality Dialog */}
         <Dialog open={isCreateSubmodalityOpen} onOpenChange={setIsCreateSubmodalityOpen}>
-          <DialogContent>
+          <DialogContent className="bg-white border-red-200">
             <DialogHeader>
-              <DialogTitle>Crear Nueva Submodalidad</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-black">Crear Nueva Submodalidad</DialogTitle>
+              <DialogDescription className="text-gray-600">
                 Agrega una nueva submodalidad al sistema
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="submodalityModality">Modalidad Padre *</Label>
+                <Label htmlFor="submodalityModality" className="text-black">Modalidad Padre *</Label>
                 <Select value={newSubmodalityModalityId} onValueChange={setNewSubmodalityModalityId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-red-200 focus:border-red-400">
                     <SelectValue placeholder="Selecciona modalidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1289,22 +1302,24 @@ export default function ContentPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="submodalityName">Nombre *</Label>
+                <Label htmlFor="submodalityName" className="text-black">Nombre *</Label>
                 <Input
                   id="submodalityName"
                   value={newSubmodalityName}
                   onChange={(e) => setNewSubmodalityName(e.target.value)}
                   placeholder="Nombre de la submodalidad"
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
               <div>
-                <Label htmlFor="submodalityDescription">Descripción</Label>
+                <Label htmlFor="submodalityDescription" className="text-black">Descripción</Label>
                 <Textarea
                   id="submodalityDescription"
                   value={newSubmodalityDescription}
                   onChange={(e) => setNewSubmodalityDescription(e.target.value)}
                   placeholder="Descripción de la submodalidad"
                   rows={3}
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
             </div>
@@ -1312,12 +1327,14 @@ export default function ContentPage() {
               <Button
                 variant="outline"
                 onClick={() => setIsCreateSubmodalityOpen(false)}
+                className="border-red-300 text-black hover:bg-red-50"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleCreateSubmodality}
                 disabled={isSubmittingSubmodality}
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 {isSubmittingSubmodality ? (
                   <>
@@ -1334,18 +1351,18 @@ export default function ContentPage() {
 
         {/* Edit Submodality Dialog */}
         <Dialog open={isEditSubmodalityOpen} onOpenChange={setIsEditSubmodalityOpen}>
-          <DialogContent>
+          <DialogContent className="bg-white border-red-200">
             <DialogHeader>
-              <DialogTitle>Editar Submodalidad</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-black">Editar Submodalidad</DialogTitle>
+              <DialogDescription className="text-gray-600">
                 Modifica los datos de la submodalidad
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="editSubmodalityModality">Modalidad Padre *</Label>
+                <Label htmlFor="editSubmodalityModality" className="text-black">Modalidad Padre *</Label>
                 <Select value={newSubmodalityModalityId} onValueChange={setNewSubmodalityModalityId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-red-200 focus:border-red-400">
                     <SelectValue placeholder="Selecciona modalidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1358,22 +1375,24 @@ export default function ContentPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="editSubmodalityName">Nombre *</Label>
+                <Label htmlFor="editSubmodalityName" className="text-black">Nombre *</Label>
                 <Input
                   id="editSubmodalityName"
                   value={newSubmodalityName}
                   onChange={(e) => setNewSubmodalityName(e.target.value)}
                   placeholder="Nombre de la submodalidad"
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
               <div>
-                <Label htmlFor="editSubmodalityDescription">Descripción</Label>
+                <Label htmlFor="editSubmodalityDescription" className="text-black">Descripción</Label>
                 <Textarea
                   id="editSubmodalityDescription"
                   value={newSubmodalityDescription}
                   onChange={(e) => setNewSubmodalityDescription(e.target.value)}
                   placeholder="Descripción de la submodalidad"
                   rows={3}
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
             </div>
@@ -1381,12 +1400,14 @@ export default function ContentPage() {
               <Button
                 variant="outline"
                 onClick={() => setIsEditSubmodalityOpen(false)}
+                className="border-red-300 text-black hover:bg-red-50"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleEditSubmodality}
                 disabled={isSubmittingSubmodality}
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 {isSubmittingSubmodality ? (
                   <>
@@ -1403,18 +1424,18 @@ export default function ContentPage() {
 
         {/* Create Category Dialog */}
         <Dialog open={isCreateNewCategoryOpen} onOpenChange={setIsCreateNewCategoryOpen}>
-          <DialogContent>
+          <DialogContent className="bg-white border-red-200">
             <DialogHeader>
-              <DialogTitle>Crear Nueva Categoría</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-black">Crear Nueva Categoría</DialogTitle>
+              <DialogDescription className="text-gray-600">
                 Agrega una nueva categoría al sistema
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="categorySubmodality">Submodalidad Padre *</Label>
+                <Label htmlFor="categorySubmodality" className="text-black">Submodalidad Padre *</Label>
                 <Select value={newCategorySubmodalityId} onValueChange={setNewCategorySubmodalityId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-red-200 focus:border-red-400">
                     <SelectValue placeholder="Selecciona submodalidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1427,22 +1448,24 @@ export default function ContentPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="categoryName">Nombre *</Label>
+                <Label htmlFor="categoryName" className="text-black">Nombre *</Label>
                 <Input
                   id="categoryName"
                   value={newCategoryHierName}
                   onChange={(e) => setNewCategoryHierName(e.target.value)}
                   placeholder="Nombre de la categoría"
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
               <div>
-                <Label htmlFor="categoryDescription">Descripción</Label>
+                <Label htmlFor="categoryDescription" className="text-black">Descripción</Label>
                 <Textarea
                   id="categoryDescription"
                   value={newCategoryHierDescription}
                   onChange={(e) => setNewCategoryHierDescription(e.target.value)}
                   placeholder="Descripción de la categoría"
                   rows={3}
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
             </div>
@@ -1450,12 +1473,14 @@ export default function ContentPage() {
               <Button
                 variant="outline"
                 onClick={() => setIsCreateNewCategoryOpen(false)}
+                className="border-red-300 text-black hover:bg-red-50"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleCreateNewCategory}
                 disabled={isSubmittingNewCategory}
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 {isSubmittingNewCategory ? (
                   <>
@@ -1472,18 +1497,18 @@ export default function ContentPage() {
 
         {/* Edit Category Dialog */}
         <Dialog open={isEditNewCategoryOpen} onOpenChange={setIsEditNewCategoryOpen}>
-          <DialogContent>
+          <DialogContent className="bg-white border-red-200">
             <DialogHeader>
-              <DialogTitle>Editar Categoría</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-black">Editar Categoría</DialogTitle>
+              <DialogDescription className="text-gray-600">
                 Modifica los datos de la categoría
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="editCategorySubmodality">Submodalidad Padre *</Label>
+                <Label htmlFor="editCategorySubmodality" className="text-black">Submodalidad Padre *</Label>
                 <Select value={newCategorySubmodalityId} onValueChange={setNewCategorySubmodalityId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-red-200 focus:border-red-400">
                     <SelectValue placeholder="Selecciona submodalidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1496,22 +1521,24 @@ export default function ContentPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="editCategoryName">Nombre *</Label>
+                <Label htmlFor="editCategoryName" className="text-black">Nombre *</Label>
                 <Input
                   id="editCategoryName"
                   value={newCategoryHierName}
                   onChange={(e) => setNewCategoryHierName(e.target.value)}
                   placeholder="Nombre de la categoría"
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
               <div>
-                <Label htmlFor="editCategoryDescription">Descripción</Label>
+                <Label htmlFor="editCategoryDescription" className="text-black">Descripción</Label>
                 <Textarea
                   id="editCategoryDescription"
                   value={newCategoryHierDescription}
                   onChange={(e) => setNewCategoryHierDescription(e.target.value)}
                   placeholder="Descripción de la categoría"
                   rows={3}
+                  className="border-red-200 focus:border-red-400"
                 />
               </div>
             </div>
@@ -1519,12 +1546,14 @@ export default function ContentPage() {
               <Button
                 variant="outline"
                 onClick={() => setIsEditNewCategoryOpen(false)}
+                className="border-red-300 text-black hover:bg-red-50"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleEditNewCategory}
                 disabled={isSubmittingNewCategory}
+                className="bg-red-600 hover:bg-red-700 text-white"
               >
                 {isSubmittingNewCategory ? (
                   <>

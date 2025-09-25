@@ -278,7 +278,7 @@ export default function ValidationPage() {
   const renderExpandableCategoryTree = (categories: CategoryTree[], path: CategoryTree[] = [], level: number = 0) => {
     return categories.map((category) => (
       <div key={category.id}>
-        <div className="flex items-center space-x-2 py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
+        <div className="flex items-center space-x-2 py-2 px-2 hover:bg-red-50 rounded-md cursor-pointer">
           {category.children.length > 0 ? (
             <button
               onClick={(e) => {
@@ -298,10 +298,10 @@ export default function ValidationPage() {
           )}
           <button
             onClick={() => selectCategory(category, path)}
-            className="flex-1 text-left text-sm hover:text-primary"
+            className="flex-1 text-left text-sm hover:text-red-900"
             style={{ marginLeft: `${level * 12}px` }}
           >
-            <span className={categoryFilter === category.id ? "font-medium text-primary" : ""}>
+            <span className={categoryFilter === category.id ? "font-medium text-red-900" : ""}>
               {category.name}
             </span>
             {category.questions_count > 0 && (
@@ -626,7 +626,7 @@ export default function ValidationPage() {
   const renderEditCategoryTree = (categories: CategoryTree[], path: CategoryTree[] = [], level: number = 0) => {
     return categories.map((category) => (
       <div key={category.id} style={{ marginLeft: `${level * 16}px` }}>
-        <div className="flex items-center space-x-2 py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
+        <div className="flex items-center space-x-2 py-2 px-2 rounded-md cursor-pointer">
           {category.children.length > 0 ? (
             <button
               onClick={() => toggleEditCategoryExpansion(category.id)}
@@ -643,7 +643,7 @@ export default function ValidationPage() {
           )}
           <button
             onClick={() => selectEditCategory(category, path)}
-            className="flex-1 text-left text-sm hover:text-primary"
+            className="flex-1 text-left text-sm hover:text-red-900"
           >
             <span className={editedCategoryId === category.id ? "font-medium text-primary" : ""}>
               {category.name}
@@ -670,140 +670,146 @@ export default function ValidationPage() {
           <p className="text-muted-foreground">Revisa y valida las respuestas generadas por la IA</p>
         </div>
 
-        <Card className="backdrop-blur-sm bg-card/80 border-border/50">
+        <Card className="bg-white border-gray-200 shadow-md">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center space-x-2 text-lg">
-              <Filter className="h-5 w-5" />
+            <CardTitle className="flex items-center space-x-2 text-lg text-black">
+              <Filter className="h-5 w-5 text-red-600" />
               <span>Filtros y Búsqueda</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm">Buscar</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar preguntas..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-background/50 h-10"
-                  />
+            <div className="space-y-4">
+              {/* Primera fila: Buscar, Estado */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Buscar</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                    <Input
+                      placeholder="Buscar preguntas..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 bg-gray-100 border-gray-300 h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm">Estado</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="bg-background/50 h-10 focus:ring-red-300 focus:ring-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value} className="focus:bg-red-50 focus:text-red-900">
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm">Estado</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="bg-background/50 h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Segunda fila: Modalidad, Submodalidad, Categoría, Resultados */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Modalidad</Label>
+                  <Select value={modalityFilter} onValueChange={(value) => {
+                    setModalityFilter(value)
+                    setSubmodalityFilter("all") // Reset submodality when modality changes
+                    setCategoryFilter("all") // Reset category when modality changes
+                  }}>
+                    <SelectTrigger className="bg-background/50 h-10 focus:ring-red-300 focus:ring-2" disabled={modalitiesLoading}>
+                      <SelectValue placeholder="Todas las modalidades" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="focus:bg-red-50 focus:text-red-900">Todas las modalidades</SelectItem>
+                      {modalities?.map((modality) => (
+                        <SelectItem key={modality.id} value={modality.id} className="focus:bg-red-50 focus:text-red-900">
+                          {modality.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm">Modalidad</Label>
-                <Select value={modalityFilter} onValueChange={(value) => {
-                  setModalityFilter(value)
-                  setSubmodalityFilter("all") // Reset submodality when modality changes
-                  setCategoryFilter("all") // Reset category when modality changes
-                }}>
-                  <SelectTrigger className="bg-background/50 h-10" disabled={modalitiesLoading}>
-                    <SelectValue placeholder="Todas las modalidades" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las modalidades</SelectItem>
-                    {modalities?.map((modality) => (
-                      <SelectItem key={modality.id} value={modality.id}>
-                        {modality.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Submodalidad</Label>
+                  <Select
+                    value={submodalityFilter}
+                    onValueChange={(value) => {
+                      setSubmodalityFilter(value)
+                      setCategoryFilter("all") // Reset category when submodality changes
+                    }}
+                    disabled={modalityFilter === "all" || submodalitiesByModalityLoading}
+                  >
+                    <SelectTrigger className="bg-background/50 h-10 focus:ring-red-300 focus:ring-2">
+                      <SelectValue placeholder="Todas las submodalidades" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="focus:bg-red-50 focus:text-red-900">Todas las submodalidades</SelectItem>
+                      {submodalitiesByModality?.map((submodality) => (
+                        <SelectItem key={submodality.id} value={submodality.id} className="focus:bg-red-50 focus:text-red-900">
+                          {submodality.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm">Submodalidad</Label>
-                <Select
-                  value={submodalityFilter}
-                  onValueChange={(value) => {
-                    setSubmodalityFilter(value)
-                    setCategoryFilter("all") // Reset category when submodality changes
-                  }}
-                  disabled={modalityFilter === "all" || submodalitiesByModalityLoading}
-                >
-                  <SelectTrigger className="bg-background/50 h-10">
-                    <SelectValue placeholder="Todas las submodalidades" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas las submodalidades</SelectItem>
-                    {submodalitiesByModality?.map((submodality) => (
-                      <SelectItem key={submodality.id} value={submodality.id}>
-                        {submodality.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm">Categoría</Label>
-                <Popover open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-between bg-background/50 h-10"
-                      disabled={categoriesTreeLoading}
-                    >
-                      <span className="truncate">
-                        {categoriesTreeLoading ? "Cargando categorías..." : getSelectedCategoryDisplay()}
-                      </span>
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-2 max-h-60 overflow-y-auto" align="start">
-                    {/* Opción "Todas las categorías" */}
-                    <div className="py-2 px-2 hover:bg-muted/50 rounded-md cursor-pointer">
-                      <button
-                        onClick={() => selectCategory(null, [])}
-                        className="w-full text-left text-sm hover:text-primary"
+                <div className="space-y-2">
+                  <Label className="text-sm">Categoría</Label>
+                  <Popover open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-between bg-background/50 h-10"
+                        disabled={categoriesTreeLoading || submodalityFilter === "all"}
                       >
-                        <span className={categoryFilter === "all" ? "font-medium text-primary" : ""}>
-                          Todas las categorías
+                        <span className="truncate">
+                          {categoriesTreeLoading ? "Cargando categorías..." : getSelectedCategoryDisplay()}
                         </span>
-                      </button>
-                    </div>
-
-                    {/* Separador */}
-                    {categoriesTree && categoriesTree.length > 0 && (
-                      <div className="border-t border-border my-2" />
-                    )}
-
-                    {/* Árbol de categorías expandible */}
-                    {categoriesTree && categoriesTree.length > 0 ? (
-                      renderExpandableCategoryTree(categoriesTree)
-                    ) : (
-                      <div className="text-sm text-muted-foreground p-2">
-                        No hay categorías disponibles
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-2 max-h-60 overflow-y-auto" align="start">
+                      {/* Opción "Todas las categorías" */}
+                      <div className="py-2 px-2 hover:bg-red-50 rounded-md cursor-pointer">
+                        <button
+                          onClick={() => selectCategory(null, [])}
+                          className="w-full text-left text-sm"
+                        >
+                          <span className={categoryFilter === "all" ? "font-medium text-red-900" : ""}>
+                            Todas las categorías
+                          </span>
+                        </button>
                       </div>
-                    )}
-                  </PopoverContent>
-                </Popover>
-              </div>
 
-              <div className="space-y-2">
-                <Label className="text-sm">Resultados</Label>
-                <div className="flex items-center h-10 px-3 bg-muted/30 rounded-md">
-                  <span className="text-sm text-muted-foreground">
-                    {pagination ? `${pagination.total_items} elementos` : `${questions.length} elementos`}
-                  </span>
+                      {/* Separador */}
+                      {categoriesTree && categoriesTree.length > 0 && (
+                        <div className="border-t border-border my-2" />
+                      )}
+
+                      {/* Árbol de categorías expandible */}
+                      {categoriesTree && categoriesTree.length > 0 ? (
+                        renderExpandableCategoryTree(categoriesTree)
+                      ) : (
+                        <div className="text-sm text-muted-foreground p-2">
+                          No hay categorías disponibles
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm">Resultados</Label>
+                  <div className="flex items-center h-10 px-3 bg-muted/30 rounded-md">
+                    <span className="text-sm text-muted-foreground">
+                      {pagination ? `${pagination.total_items} elementos` : `${questions.length} elementos`}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -825,20 +831,20 @@ export default function ValidationPage() {
             </Button>
           </div>
         ) : (
-          <Card className="backdrop-blur-sm bg-card/80 border-border/50">
+          <Card className="bg-white border-gray-200 shadow-md">
             <CardContent className="p-0">
               {/* Encabezados de la tabla - Responsivo */}
-              <div className="hidden lg:grid grid-cols-12 gap-3 lg:gap-4 p-4 border-b border-border/30 bg-muted/20">
-                <div className="col-span-4 xl:col-span-5 text-sm font-medium text-muted-foreground">
+              <div className="hidden md:grid grid-cols-12 gap-3 lg:gap-4 p-4 border-b border-gray-200 bg-gray-50">
+                <div className="col-span-6 lg:col-span-6 xl:col-span-7 text-sm font-medium text-muted-foreground">
                   Pregunta / Respuesta Generada
                 </div>
-                <div className="col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground">
+                <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground">
                   Estado
                 </div>
-                <div className="col-span-4 xl:col-span-3 text-sm font-medium text-muted-foreground">
+                <div className="col-span-2 lg:col-span-2 xl:col-span-1 text-sm font-medium text-muted-foreground">
                   Categoría / Doc
                 </div>
-                <div className="col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground text-right">
+                <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground text-right">
                   Acciones
                 </div>
               </div>
@@ -846,14 +852,14 @@ export default function ValidationPage() {
               {/* Filas de datos */}
               <div className="space-y-3 p-4">
                 {questions.map((question) => (
-                  <Card 
-                    key={question.question_id} 
-                    className="backdrop-blur-sm bg-card/50 border-border/30 hover:bg-card/70 transition-all duration-200 hover:shadow-md"
+                  <Card
+                    key={question.question_id}
+                    className="bg-white border-gray-200 hover:bg-gray-50 transition-all duration-200 hover:shadow-md"
                   >
                     <CardContent className="p-4">
-                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 lg:gap-4">
                     {/* Columna: Pregunta / Respuesta */}
-                    <div className="lg:col-span-4 xl:col-span-5 space-y-2">
+                    <div className="md:col-span-6 lg:col-span-6 xl:col-span-7 space-y-2">
                       <div>
                         <h3 className="font-semibold text-sm leading-tight mb-1">
                           {question.question_text}
@@ -951,7 +957,7 @@ export default function ValidationPage() {
                     </div>
 
                     {/* Columna: Estado */}
-                    <div className="hidden lg:flex lg:col-span-2 xl:col-span-2 flex-col justify-start space-y-1">
+                    <div className="hidden md:flex md:col-span-2 lg:col-span-2 xl:col-span-2 flex-col justify-start space-y-1">
                       {getStatusBadge(question.status)}
                       <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                         <Calendar className="h-3 w-3" />
@@ -960,7 +966,7 @@ export default function ValidationPage() {
                     </div>
 
                     {/* Columna: Categoría (con Doc abajo) */}
-                    <div className="hidden lg:flex lg:col-span-4 xl:col-span-3 flex-col justify-start space-y-1">
+                    <div className="hidden md:flex md:col-span-2 lg:col-span-2 xl:col-span-1 flex-col justify-start space-y-1">
                       <Badge variant="outline" className="text-xs w-fit">
                         {question.category_name}
                       </Badge>
@@ -984,7 +990,7 @@ export default function ValidationPage() {
                     </div>
 
                     {/* Columna: Acciones */}
-                    <div className="lg:col-span-2 xl:col-span-2 flex flex-col lg:items-end space-y-2">
+                    <div className="md:col-span-2 lg:col-span-2 xl:col-span-2 flex flex-col md:items-end space-y-2">
                       {question.status === "PENDING" && (
                         <div className="flex flex-col space-y-1">
                           <Button
@@ -1355,10 +1361,15 @@ export default function ValidationPage() {
               </div>
             )}
             <DialogFooter>
-              <Button variant="outline" onClick={handleCloseEdit} disabled={isSaving}>
+              <Button
+                variant="outline"
+                onClick={handleCloseEdit}
+                disabled={isSaving}
+                className="hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+              >
                 Cancelar
               </Button>
-              <Button onClick={handleSaveEdit} disabled={isSaving}>
+              <Button variant="destructive" onClick={handleSaveEdit} disabled={isSaving}>
                 {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

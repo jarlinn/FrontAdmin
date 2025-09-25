@@ -61,21 +61,21 @@ const howItWorksSteps = [
     title: "Agregar Contenido",
     description: "Sube documentos PDF o ingresa texto directamente para alimentar la base de conocimiento",
     icon: Upload,
-    color: "bg-primary/10 text-primary",
+    color: "bg-red-100 text-red-600",
   },
   {
     step: 2,
     title: "IA Genera Respuestas",
     description: "El sistema procesa automáticamente el contenido y genera respuestas contextuales",
     icon: Brain,
-    color: "bg-secondary/10 text-secondary",
+    color: "bg-red-100 text-red-600",
   },
   {
     step: 3,
     title: "Validar y Editar",
     description: "Revisa, edita y aprueba las respuestas antes de que estén disponibles para los usuarios",
     icon: CheckCircle,
-    color: "bg-accent/10 text-accent",
+    color: "bg-red-100 text-red-600",
   },
 ]
 
@@ -85,21 +85,21 @@ const quickActions = [
     description: "Agregar nueva información al chatbot",
     href: "/dashboard/content",
     icon: FileText,
-    color: "bg-primary hover:bg-primary/90",
+    color: "bg-red-600 hover:bg-red-700",
   },
   {
     title: "Validar Respuestas",
     description: "Revisar respuestas pendientes",
     href: "/dashboard/validation",
     icon: CheckCircle,
-    color: "bg-secondary hover:bg-secondary/90",
+    color: "bg-red-600 hover:bg-red-700",
   },
   {
     title: "Ver Estadísticas",
     description: "Analizar el rendimiento del chatbot",
     href: "/dashboard/statistics",
     icon: BarChart3,
-    color: "bg-accent hover:bg-accent/90",
+    color: "bg-red-600 hover:bg-red-700",
   },
 ]
 
@@ -109,8 +109,8 @@ export default function DashboardPage() {
       <div className="space-y-8">
         {/* Welcome Header */}
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Bienvenido, Admin Usuario</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-black">Bienvenido, Admin Usuario</h1>
+          <p className="text-gray-600">
             Panel de administración del chatbot universitario - Ingeniería de Sistemas
           </p>
         </div>
@@ -120,31 +120,31 @@ export default function DashboardPage() {
           {stats.map((stat, index) => (
             <Card
               key={index}
-              className="backdrop-blur-sm bg-card/80 border-border/50 hover:bg-card/90 transition-colors"
+              className="bg-white border-gray-200 hover:bg-gray-50 transition-colors shadow-md"
             >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-gray-600">{stat.title}</CardTitle>
+                <stat.icon className="h-4 w-4 text-gray-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-foreground">{stat.value}</div>
+                <div className="text-2xl font-bold text-black">{stat.value}</div>
                 <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant={stat.changeType === "positive" ? "default" : "destructive"} className="text-xs">
+                  <Badge variant={stat.changeType === "positive" ? "default" : "destructive"} className="text-xs bg-gray-100 text-gray-800 border-gray-300">
                     <TrendingUp className="h-3 w-3 mr-1" />
                     {stat.change}
                   </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">{stat.description}</p>
+                <p className="text-xs text-gray-500 mt-2">{stat.description}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
         {/* How It Works Section */}
-        <Card className="backdrop-blur-sm bg-card/80 border-border/50">
+        <Card className="bg-white border-gray-200 shadow-md">
           <CardHeader>
-            <CardTitle className="text-xl text-foreground">¿Cómo Funciona?</CardTitle>
-            <CardDescription>Proceso simple para gestionar el conocimiento del chatbot universitario</CardDescription>
+            <CardTitle className="text-xl text-black">¿Cómo Funciona?</CardTitle>
+            <CardDescription className="text-gray-600">Proceso simple para gestionar el conocimiento del chatbot universitario</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -160,13 +160,13 @@ export default function DashboardPage() {
                           Paso {step.step}
                         </Badge>
                       </div>
-                      <h3 className="font-semibold text-foreground">{step.title}</h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
+                      <h3 className="font-semibold text-black">{step.title}</h3>
+                      <p className="text-sm text-gray-600 leading-relaxed">{step.description}</p>
                     </div>
                   </div>
                   {index < howItWorksSteps.length - 1 && (
                     <div className="hidden md:block absolute top-8 left-full w-full">
-                      <ArrowRight className="h-6 w-6 text-muted-foreground mx-auto" />
+                      <ArrowRight className="h-6 w-6 text-gray-400 mx-auto" />
                     </div>
                   )}
                 </div>
@@ -176,10 +176,10 @@ export default function DashboardPage() {
         </Card>
 
         {/* Quick Actions */}
-        <Card className="backdrop-blur-sm bg-card/80 border-border/50">
+        <Card className="bg-white border-gray-200 shadow-md">
           <CardHeader>
-            <CardTitle className="text-xl text-foreground">Accesos Rápidos</CardTitle>
-            <CardDescription>Accede directamente a las funciones principales del sistema</CardDescription>
+            <CardTitle className="text-xl text-black">Accesos Rápidos</CardTitle>
+            <CardDescription className="text-gray-600">Accede directamente a las funciones principales del sistema</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

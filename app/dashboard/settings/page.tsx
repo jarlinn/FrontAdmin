@@ -188,7 +188,7 @@ export default function SettingsPage() {
                       value={profileForm.name || ''}
                       onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Ingresa tu nombre completo"
-                      className="bg-background/50"
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
                     />
                   </div>
 
@@ -200,11 +200,11 @@ export default function SettingsPage() {
                       value={profileForm.email || ''}
                       onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="tu@email.com"
-                      className={`bg-background/50 ${
-                        profileForm.email && 
+                      className={`bg-background/50 border-gray-300 focus:border-red-400 ${
+                        profileForm.email &&
                         !isValidEmail(profileForm.email)
                           ? 'border-red-500 focus:border-red-500'
-                          : profileForm.email && 
+                          : profileForm.email &&
                             isValidEmail(profileForm.email)
                             ? 'border-green-500 focus:border-green-500'
                             : ''
@@ -241,11 +241,11 @@ export default function SettingsPage() {
                     </div>
                   )}
 
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full bg-red-600 hover:bg-red-700 text-white"
                     disabled={Boolean(
-                      updateProfileLoading || 
+                      updateProfileLoading ||
                       (isFieldEmpty(profileForm.name) && isFieldEmpty(profileForm.email)) ||
                       (profileForm.email && !isValidEmail(profileForm.email))
                     )}
@@ -302,7 +302,7 @@ export default function SettingsPage() {
                     value={passwordForm.current_password}
                     onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))}
                     placeholder="Ingresa tu contraseña actual"
-                    className="bg-background/50"
+                    className="bg-background/50 border-gray-300 focus:border-red-400"
                     required
                   />
                 </div>
@@ -315,7 +315,7 @@ export default function SettingsPage() {
                     value={passwordForm.new_password}
                     onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
                     placeholder="Ingresa tu nueva contraseña"
-                    className="bg-background/50"
+                    className="bg-background/50 border-gray-300 focus:border-red-400"
                     required
                   />
                   <p className="text-xs text-muted-foreground">
@@ -331,11 +331,11 @@ export default function SettingsPage() {
                     value={passwordForm.confirm_password}
                     onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
                     placeholder="Confirma tu nueva contraseña"
-                    className={`bg-background/50 ${
-                      passwordForm.confirm_password && 
-                      passwordForm.new_password !== passwordForm.confirm_password 
-                        ? 'border-red-500 focus:border-red-500' 
-                        : passwordForm.confirm_password && 
+                    className={`bg-background/50 border-gray-300 focus:border-red-400 ${
+                      passwordForm.confirm_password &&
+                      passwordForm.new_password !== passwordForm.confirm_password
+                        ? 'border-red-500 focus:border-red-500'
+                        : passwordForm.confirm_password &&
                           passwordForm.new_password === passwordForm.confirm_password
                           ? 'border-green-500 focus:border-green-500'
                           : ''
@@ -356,13 +356,13 @@ export default function SettingsPage() {
                   )}
                 </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full" 
+                <Button
+                  type="submit"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
                   disabled={
-                    updatePasswordLoading || 
-                    !passwordForm.current_password || 
-                    !passwordForm.new_password || 
+                    updatePasswordLoading ||
+                    !passwordForm.current_password ||
+                    !passwordForm.new_password ||
                     !passwordForm.confirm_password ||
                     passwordForm.new_password !== passwordForm.confirm_password ||
                     passwordForm.new_password.length < 8
