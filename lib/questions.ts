@@ -18,6 +18,8 @@ export interface Question {
 
 export interface QuestionFilters {
   status?: "PENDING" | "APPROVED" | "DISABLED" | "all"
+  modality_id?: string
+  submodality_id?: string
   category_id?: string
   search?: string
   page?: number
@@ -59,10 +61,18 @@ class QuestionService {
         queryParams.append('status', filters.status)
       }
       
+      if (filters?.modality_id) {
+        queryParams.append('modality_id', filters.modality_id)
+      }
+
+      if (filters?.submodality_id) {
+        queryParams.append('submodality_id', filters.submodality_id)
+      }
+
       if (filters?.category_id) {
         queryParams.append('category_id', filters.category_id)
       }
-      
+
       if (filters?.search) {
         queryParams.append('search', filters.search)
       }

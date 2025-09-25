@@ -400,7 +400,7 @@ export default function ContentPage() {
         setGenerationProgress(prev => Math.min(prev + 10, 90))
       }, 500)
 
-      const response = await fetchData('/chat/questions/', {
+      const response = await fetchData(buildApiUrl(API_CONFIG.ENDPOINTS.QUESTIONS), {
         method: 'POST',
         body: formData
       })
@@ -409,15 +409,15 @@ export default function ContentPage() {
       setGenerationProgress(100)
 
       if (response) {
-        setGeneratedResponse(response.response)
-        
-        if (response.id) {
-          setCurrentQuestionId(response.id)
+        setGeneratedResponse(response.model_response || response.response)
+
+        if (response.question_id || response.id) {
+          setCurrentQuestionId(response.question_id || response.id)
         }
 
-        setEditableModelResponse(response.response)
+        setEditableModelResponse(response.model_response || response.response)
         setShowPreview(true)
-        
+
         console.log("Pregunta generada exitosamente:", response)
       }
     } catch (error) {
@@ -440,7 +440,7 @@ export default function ContentPage() {
     }
 
     try {
-      const response = await fetchData(`/chat/questions/${currentQuestionId}/`, {
+      const response = await fetchData(buildApiUrl(`${API_CONFIG.ENDPOINTS.QUESTIONS_NO_SLASH}/${currentQuestionId}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -462,10 +462,11 @@ export default function ContentPage() {
       setSelectedSubmodalityId("")
       setSelectedPath([])
       setCurrentQuestionId(null)
-      
+
       console.log("Respuesta actualizada exitosamente:", response)
-      
-      router.refresh()
+
+      // Redirect to validation page
+      router.push('/dashboard/validation')
     } catch (error) {
       console.error("Error al actualizar respuesta:", error)
     }

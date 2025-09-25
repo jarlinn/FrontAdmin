@@ -19,36 +19,36 @@ import {
 import Link from "next/link"
 import AdminLayout from "@/components/admin-layout"
 
-// Mock data for statistics
+// Mock data for statistics (set to 0 for demo)
 const stats = [
   {
     title: "Preguntas Configuradas",
-    value: "1,247",
-    change: "+12%",
+    value: "0",
+    change: "+0%",
     changeType: "positive" as const,
     icon: MessageSquare,
     description: "Total de preguntas en la base de conocimiento",
   },
   {
     title: "Pendientes de Revisión",
-    value: "23",
-    change: "-8%",
+    value: "0",
+    change: "+0%",
     changeType: "positive" as const,
     icon: AlertCircle,
     description: "Respuestas generadas por IA esperando validación",
   },
   {
     title: "Usuarios Activos",
-    value: "892",
-    change: "+24%",
+    value: "0",
+    change: "+0%",
     changeType: "positive" as const,
     icon: Users,
     description: "Usuarios que interactuaron en el último mes",
   },
   {
     title: "Tiempo Promedio",
-    value: "2.3s",
-    change: "-15%",
+    value: "0s",
+    change: "+0%",
     changeType: "positive" as const,
     icon: Clock,
     description: "Tiempo promedio de respuesta del chatbot",
@@ -202,54 +202,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity Preview */}
-        <Card className="backdrop-blur-sm bg-card/80 border-border/50">
-          <CardHeader>
-            <CardTitle className="text-xl text-foreground">Actividad Reciente</CardTitle>
-            <CardDescription>Últimas interacciones y cambios en el sistema</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                {
-                  action: "Nueva pregunta agregada",
-                  details: "¿Cuáles son los requisitos para inscripción?",
-                  time: "Hace 2 horas",
-                  type: "content",
-                },
-                {
-                  action: "Respuesta validada",
-                  details: "Información sobre horarios de clases",
-                  time: "Hace 4 horas",
-                  type: "validation",
-                },
-                {
-                  action: "Usuario activo",
-                  details: "892 consultas realizadas hoy",
-                  time: "Hace 6 horas",
-                  type: "activity",
-                },
-              ].map((activity, index) => (
-                <div key={index} className="flex items-center space-x-4 p-3 rounded-lg bg-muted/30">
-                  <div className="w-2 h-2 rounded-full bg-primary" />
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium text-foreground">{activity.action}</p>
-                    <p className="text-xs text-muted-foreground">{activity.details}</p>
-                  </div>
-                  <div className="text-xs text-muted-foreground">{activity.time}</div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 pt-4 border-t border-border/50">
-              <Button variant="outline" className="w-full bg-transparent" asChild>
-                <Link href="/dashboard/statistics">
-                  Ver Todas las Actividades
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </AdminLayout>
   )

@@ -56,7 +56,10 @@ import { useDropzone } from "react-dropzone"
 import { useQuestions } from "@/hooks/use-questions"
 import { Question, QuestionFilters, UpdateQuestionRequest } from "@/lib/questions"
 import { useCategoriesTree } from "@/hooks/use-categories"
+import { useModalities } from "@/hooks/use-modalities"
+import { useSubmodalities, useSubmodalitiesByModality } from "@/hooks/use-submodalities"
 import { CategoryTree } from "@/lib/categories"
+import { Modality } from "@/lib/modalities"
 import { authService } from "@/lib/auth"
 import { buildApiUrl } from "@/lib/api-config"
 
@@ -74,14 +77,18 @@ interface EditUploadedFile {
 }
 
 export default function ValidationPage() {
-  // Hooks para datos reales
-  const { questions, pagination, loading, error, refreshQuestions, updateQuestionStatus, updateQuestion, recalculateQuestion, deleteQuestion, applyFilters, goToPage } = useQuestions()
-  const { categoriesTree, loading: categoriesTreeLoading, error: categoriesTreeError, refreshCategoriesTree } = useCategoriesTree()
-  
   // Estados locales
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [modalityFilter, setModalityFilter] = useState("all")
+  const [submodalityFilter, setSubmodalityFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
+
+  // Hooks para datos reales
+  const { questions, pagination, loading, error, refreshQuestions, updateQuestionStatus, updateQuestion, recalculateQuestion, deleteQuestion, applyFilters, goToPage } = useQuestions()
+  const { categoriesTree, loading: categoriesTreeLoading, error: categoriesTreeError, refreshCategoriesTree } = useCategoriesTree()
+  const { modalities, loading: modalitiesLoading } = useModalities()
+  const { submodalities: submodalitiesByModality, loading: submodalitiesByModalityLoading } = useSubmodalitiesByModality(modalityFilter !== "all" ? modalityFilter : "")
   
 
   // Estados para selector desplegable de categorías
@@ -139,26 +146,34 @@ export default function ValidationPage() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       const filters: QuestionFilters = {}
-      
+
       // Siempre incluir status (el backend maneja "all" como mostrar todos)
       filters.status = statusFilter as "PENDING" | "APPROVED" | "DISABLED" | "all"
-      
-      // Siempre incluir category_id (el backend maneja "all" como mostrar todas)
-      filters.category_id = categoryFilter
-      
+
+      // Nuevos filtros jerárquicos
+      if (modalityFilter !== "all") {
+        filters.modality_id = modalityFilter
+      }
+      if (submodalityFilter !== "all") {
+        filters.submodality_id = submodalityFilter
+      }
+      if (categoryFilter !== "all") {
+        filters.category_id = categoryFilter
+      }
+
       if (searchTerm.trim()) {
         filters.search = searchTerm.trim()
       }
-      
+
       console.log('🔍 Enviando filtros al backend:', filters)
-      
+
       // Llamar directamente a applyFilters sin incluirlo en dependencias
       applyFilters(filters)
     }, 300) // Debounce de 300ms
 
     return () => clearTimeout(timeoutId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, statusFilter, categoryFilter])
+  }, [searchTerm, statusFilter, modalityFilter, submodalityFilter, categoryFilter])
 
   // Cerrar selector de árbol al hacer clic fuera
   useEffect(() => {
@@ -663,7 +678,7 @@ export default function ValidationPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm">Buscar</Label>
                 <div className="relative">
@@ -687,6 +702,51 @@ export default function ValidationPage() {
                     {statusOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Modalidad</Label>
+                <Select value={modalityFilter} onValueChange={(value) => {
+                  setModalityFilter(value)
+                  setSubmodalityFilter("all") // Reset submodality when modality changes
+                  setCategoryFilter("all") // Reset category when modality changes
+                }}>
+                  <SelectTrigger className="bg-background/50 h-10" disabled={modalitiesLoading}>
+                    <SelectValue placeholder="Todas las modalidades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las modalidades</SelectItem>
+                    {modalities?.map((modality) => (
+                      <SelectItem key={modality.id} value={modality.id}>
+                        {modality.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Submodalidad</Label>
+                <Select
+                  value={submodalityFilter}
+                  onValueChange={(value) => {
+                    setSubmodalityFilter(value)
+                    setCategoryFilter("all") // Reset category when submodality changes
+                  }}
+                  disabled={modalityFilter === "all" || submodalitiesByModalityLoading}
+                >
+                  <SelectTrigger className="bg-background/50 h-10">
+                    <SelectValue placeholder="Todas las submodalidades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las submodalidades</SelectItem>
+                    {submodalitiesByModality?.map((submodality) => (
+                      <SelectItem key={submodality.id} value={submodality.id}>
+                        {submodality.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -720,12 +780,12 @@ export default function ValidationPage() {
                         </span>
                       </button>
                     </div>
-                    
+
                     {/* Separador */}
                     {categoriesTree && categoriesTree.length > 0 && (
                       <div className="border-t border-border my-2" />
                     )}
-                    
+
                     {/* Árbol de categorías expandible */}
                     {categoriesTree && categoriesTree.length > 0 ? (
                       renderExpandableCategoryTree(categoriesTree)
