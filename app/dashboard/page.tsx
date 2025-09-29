@@ -19,7 +19,6 @@ import {
 import Link from "next/link"
 import AdminLayout from "@/components/admin-layout"
 
-// Mock data for statistics (set to 0 for demo)
 const stats = [
   {
     title: "Preguntas Configuradas",
@@ -94,13 +93,13 @@ const quickActions = [
     icon: CheckCircle,
     color: "bg-red-600 hover:bg-red-700",
   },
-  {
-    title: "Ver Estadísticas",
-    description: "Analizar el rendimiento del chatbot",
-    href: "/dashboard/statistics",
-    icon: BarChart3,
-    color: "bg-red-600 hover:bg-red-700",
-  },
+  // {
+  //   title: "Ver Estadísticas",
+  //   description: "Analizar el rendimiento del chatbot",
+  //   href: "/dashboard/statistics",
+  //   icon: BarChart3,
+  //   color: "bg-red-600 hover:bg-red-700",
+  // }
 ]
 
 export default function DashboardPage() {
