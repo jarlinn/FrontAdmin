@@ -96,8 +96,25 @@ class NewCategoryService {
       )
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Error al crear categoría')
+        let errorData: any = {}
+        let errorText = ''
+        try {
+          errorData = await response.json()
+        } catch {
+          try {
+            errorText = await response.text()
+          } catch {
+            // nothing
+          }
+        }
+        let errorMessage = 'Error desconocido'
+        if (errorData.error?.details?.original_detail && typeof errorData.error.details.original_detail === 'string') errorMessage = errorData.error.details.original_detail
+        else if (typeof errorData.detail === 'string') errorMessage = errorData.detail
+        else if (typeof errorData.message === 'string') errorMessage = errorData.message
+        else if (typeof errorData.error === 'string') errorMessage = errorData.error
+        else if (errorText) errorMessage = errorText
+        else errorMessage = `Error ${response.status}: ${response.statusText}`
+        throw new Error(errorMessage)
       }
 
       const category: NewCategory = await response.json()
@@ -127,8 +144,25 @@ class NewCategoryService {
       )
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Error al actualizar categoría')
+        let errorData: any = {}
+        let errorText = ''
+        try {
+          errorData = await response.json()
+        } catch {
+          try {
+            errorText = await response.text()
+          } catch {
+            // nothing
+          }
+        }
+        let errorMessage = 'Error desconocido'
+        if (errorData.error?.details?.original_detail && typeof errorData.error.details.original_detail === 'string') errorMessage = errorData.error.details.original_detail
+        else if (typeof errorData.detail === 'string') errorMessage = errorData.detail
+        else if (typeof errorData.message === 'string') errorMessage = errorData.message
+        else if (typeof errorData.error === 'string') errorMessage = errorData.error
+        else if (errorText) errorMessage = errorText
+        else errorMessage = `Error ${response.status}: ${response.statusText}`
+        throw new Error(errorMessage)
       }
 
       const category: NewCategory = await response.json()

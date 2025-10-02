@@ -27,7 +27,7 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Contenido", href: "/dashboard/content", icon: MessageSquare },
   { name: "Validación", href: "/dashboard/validation", icon: CheckCircle },
-  { name: "Estadísticas", href: "/dashboard/statistics", icon: BarChart3 },
+  // { name: "Estadísticas", href: "/dashboard/statistics", icon: BarChart3 },
   { name: "Configuración", href: "/dashboard/settings", icon: Settings },
 ]
 
