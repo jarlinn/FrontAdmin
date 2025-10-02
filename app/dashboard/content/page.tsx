@@ -52,6 +52,9 @@ export default function ContentPage() {
   const [showPreview, setShowPreview] = useState(false)
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(null)
   const [selectedPath, setSelectedPath] = useState<any[]>([])
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [showErrorDialog, setShowErrorDialog] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
 
   // Estados para modalidades
   const [isCreateModalityOpen, setIsCreateModalityOpen] = useState(false)
@@ -82,43 +85,53 @@ export default function ContentPage() {
   // Hooks
   const { fetchData, loading: authLoading } = useAuthFetch()
   const { questions, loading: questionsLoading, refreshQuestions } = useQuestions()
-  const { 
-    modalities, 
-    loading: modalitiesLoading, 
+  const {
+    modalities,
+    loading: modalitiesLoading,
     error: modalitiesError,
-    createModality, 
-    updateModality, 
+    createModality,
+    updateModality,
     deleteModality,
     refreshModalities
   } = useModalities()
 
-  const { 
-    submodalities, 
-    loading: submodalitiesLoading, 
+  const {
+    submodalities,
+    loading: submodalitiesLoading,
     error: submodalitiesError,
-    createSubmodality, 
-    updateSubmodality, 
+    createSubmodality,
+    updateSubmodality,
     deleteSubmodality
   } = useSubmodalities()
 
-  const { 
-    submodalities: submodalitiesByModality, 
+  const {
+    submodalities: submodalitiesByModality,
     loading: submodalitiesByModalityLoading
   } = useSubmodalitiesByModality(selectedModalityId)
 
-  const { 
-    newCategories, 
-    loading: newCategoriesLoading, 
+  const {
+    newCategories,
+    loading: newCategoriesLoading,
     error: newCategoriesError,
-    createNewCategory, 
-    updateNewCategory, 
+    createNewCategory,
+    updateNewCategory,
     deleteNewCategory
   } = useNewCategories()
 
-  const { 
-    categories: categoriesBySubmodality, 
+  const {
+    categories: categoriesBySubmodality,
     loading: categoriesBySubmodalityLoading
   } = useCategoriesBySubmodality(selectedSubmodalityId)
+
+  // Clear dependent selections when parent changes
+  useEffect(() => {
+    setSelectedSubmodalityId("")
+    setSelectedCategoryId("")
+  }, [selectedModalityId])
+
+  useEffect(() => {
+    setSelectedCategoryId("")
+  }, [selectedSubmodalityId])
 
   // Funciones para manejar modalidades
   const handleCreateModality = async () => {
@@ -130,14 +143,21 @@ export default function ContentPage() {
         name: newModalityName,
         description: newModalityDescription || undefined
       })
-      
+
       setNewModalityName("")
       setNewModalityDescription("")
       setIsCreateModalityOpen(false)
-      
+
       console.log("Modalidad creada exitosamente")
-    } catch (error) {
-      console.error("Error al crear modalidad:", error)
+    } catch (error: any) {
+      if (error.message?.startsWith('Ya existe una modalidad')) {
+        setErrorMessage('Ya existe una modalidad con ese nombre')
+        setShowErrorDialog(true)
+      } else {
+        console.error("Error al crear modalidad:", error)
+        setErrorMessage(error.message || 'Error al crear la modalidad')
+        setShowErrorDialog(true)
+      }
     } finally {
       setIsSubmittingModality(false)
     }
@@ -152,15 +172,22 @@ export default function ContentPage() {
         name: newModalityName,
         description: newModalityDescription || undefined
       })
-      
+
       setNewModalityName("")
       setNewModalityDescription("")
       setEditingModality(null)
       setIsEditModalityOpen(false)
-      
+
       console.log("Modalidad actualizada exitosamente")
-    } catch (error) {
-      console.error("Error al actualizar modalidad:", error)
+    } catch (error: any) {
+      if (error.message?.startsWith('Ya existe una modalidad')) {
+        setErrorMessage('Ya existe una modalidad con ese nombre')
+        setShowErrorDialog(true)
+      } else {
+        console.error("Error al actualizar modalidad:", error)
+        setErrorMessage(error.message || 'Error al actualizar la modalidad')
+        setShowErrorDialog(true)
+      }
     } finally {
       setIsSubmittingModality(false)
     }
@@ -193,15 +220,22 @@ export default function ContentPage() {
         description: newSubmodalityDescription || undefined,
         modality_id: newSubmodalityModalityId
       })
-      
+
       setNewSubmodalityName("")
       setNewSubmodalityDescription("")
       setNewSubmodalityModalityId("")
       setIsCreateSubmodalityOpen(false)
-      
+
       console.log("Submodalidad creada exitosamente")
-    } catch (error) {
-      console.error("Error al crear submodalidad:", error)
+    } catch (error: any) {
+      if (error.message?.startsWith('Ya existe una submodalidad')) {
+        setErrorMessage('Ya existe una submodalidad con ese nombre')
+        setShowErrorDialog(true)
+      } else {
+        console.error("Error al crear submodalidad:", error)
+        setErrorMessage(error.message || 'Error al crear la submodalidad')
+        setShowErrorDialog(true)
+      }
     } finally {
       setIsSubmittingSubmodality(false)
     }
@@ -217,16 +251,23 @@ export default function ContentPage() {
         description: newSubmodalityDescription || undefined,
         modality_id: newSubmodalityModalityId || editingSubmodality.modality_id
       })
-      
+
       setNewSubmodalityName("")
       setNewSubmodalityDescription("")
       setNewSubmodalityModalityId("")
       setEditingSubmodality(null)
       setIsEditSubmodalityOpen(false)
-      
+
       console.log("Submodalidad actualizada exitosamente")
-    } catch (error) {
-      console.error("Error al actualizar submodalidad:", error)
+    } catch (error: any) {
+      if (error.message?.startsWith('Ya existe una submodalidad')) {
+        setErrorMessage('Ya existe una submodalidad con ese nombre')
+        setShowErrorDialog(true)
+      } else {
+        console.error("Error al actualizar submodalidad:", error)
+        setErrorMessage(error.message || 'Error al actualizar la submodalidad')
+        setShowErrorDialog(true)
+      }
     } finally {
       setIsSubmittingSubmodality(false)
     }
@@ -260,15 +301,22 @@ export default function ContentPage() {
         description: newCategoryHierDescription || undefined,
         submodality_id: newCategorySubmodalityId
       })
-      
+
       setNewCategoryHierName("")
       setNewCategoryHierDescription("")
       setNewCategorySubmodalityId("")
       setIsCreateNewCategoryOpen(false)
-      
+
       console.log("Categoría creada exitosamente")
-    } catch (error) {
-      console.error("Error al crear categoría:", error)
+    } catch (error: any) {
+      if (error.message?.startsWith('Ya existe una categoría')) {
+        setErrorMessage('Ya existe una categoría con ese nombre')
+        setShowErrorDialog(true)
+      } else {
+        console.error("Error al crear categoría:", error)
+        setErrorMessage(error.message || 'Error al crear la categoría')
+        setShowErrorDialog(true)
+      }
     } finally {
       setIsSubmittingNewCategory(false)
     }
@@ -284,16 +332,23 @@ export default function ContentPage() {
         description: newCategoryHierDescription || undefined,
         submodality_id: newCategorySubmodalityId || editingNewCategory.submodality_id
       })
-      
+
       setNewCategoryHierName("")
       setNewCategoryHierDescription("")
       setNewCategorySubmodalityId("")
       setEditingNewCategory(null)
       setIsEditNewCategoryOpen(false)
-      
+
       console.log("Categoría actualizada exitosamente")
-    } catch (error) {
-      console.error("Error al actualizar categoría:", error)
+    } catch (error: any) {
+      if (error.message?.startsWith('Ya existe una categoría')) {
+        setErrorMessage('Ya existe una categoría con ese nombre')
+        setShowErrorDialog(true)
+      } else {
+        console.error("Error al actualizar categoría:", error)
+        setErrorMessage(error.message || 'Error al actualizar la categoría')
+        setShowErrorDialog(true)
+      }
     } finally {
       setIsSubmittingNewCategory(false)
     }
@@ -353,19 +408,23 @@ export default function ContentPage() {
   // Función para generar respuesta
   const handleGenerateResponse = async () => {
     if (!question.trim()) {
-      alert('Debes escribir una pregunta')
+      setErrorMessage('Debes escribir una pregunta')
+      setShowErrorDialog(true)
       return
     }
     if (contextType === "text" && !context.trim()) {
-      alert('Debes proporcionar contexto en texto')
+      setErrorMessage('Debes proporcionar contexto en texto')
+      setShowErrorDialog(true)
       return
     }
     if (contextType === "pdf" && uploadedFiles.length === 0) {
-      alert('Debes subir un archivo PDF')
+      setErrorMessage('Debes subir un archivo PDF')
+      setShowErrorDialog(true)
       return
     }
     if (!selectedModalityId) {
-      alert('Debes seleccionar una modalidad')
+      setErrorMessage('Debes seleccionar una modalidad')
+      setShowErrorDialog(true)
       return
     }
 
@@ -427,12 +486,14 @@ export default function ContentPage() {
   // Función para actualizar respuesta
   const handleUpdateResponse = async () => {
     if (!editableModelResponse.trim()) {
-      alert('La respuesta no puede estar vacía')
+      setErrorMessage('La respuesta no puede estar vacía')
+      setShowErrorDialog(true)
       return
     }
-    
+
     if (!currentQuestionId) {
-      alert('No hay una pregunta para actualizar')
+      setErrorMessage('No hay una pregunta para actualizar')
+      setShowErrorDialog(true)
       return
     }
 
@@ -445,23 +506,10 @@ export default function ContentPage() {
         body: formData
       })
 
-      setQuestion("")
-      setContext("")
-      setUploadedFiles([])
-      setGeneratedResponse("")
-      setEditableModelResponse("")
-      setIsEditingResponse(false)
-      setShowPreview(false)
-      setSelectedCategoryId("")
-      setSelectedModalityId("")
-      setSelectedSubmodalityId("")
-      setSelectedPath([])
-      setCurrentQuestionId(null)
-
       console.log("Respuesta actualizada exitosamente:", response)
 
-      // Redirect to validation page
-      router.push('/dashboard/validation')
+      // Show success dialog
+      setShowSuccessDialog(true)
     } catch (error) {
       console.error("Error al actualizar respuesta:", error)
     }
@@ -546,60 +594,99 @@ export default function ContentPage() {
                       {/* Modalidad */}
                       <div className="space-y-2">
                         <Label>Modalidad *</Label>
-                        <Select value={selectedModalityId} onValueChange={setSelectedModalityId}>
-                          <SelectTrigger className="bg-gray-100 border-gray-300">
-                            <SelectValue placeholder="Selecciona modalidad" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {modalities?.map((modality) => (
-                              <SelectItem key={modality.id} value={modality.id}>
-                                {modality.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex gap-2">
+                          <Select value={selectedModalityId} onValueChange={setSelectedModalityId}>
+                            <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
+                              <SelectValue placeholder="Selecciona modalidad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {modalities?.map((modality) => (
+                                <SelectItem key={modality.id} value={modality.id}>
+                                  {modality.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedModalityId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedModalityId("")}
+                              className="px-2"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Submodalidad */}
                       <div className="space-y-2">
                         <Label>Submodalidad (Opcional)</Label>
-                        <Select
-                          value={selectedSubmodalityId}
-                          onValueChange={setSelectedSubmodalityId}
-                          disabled={!selectedModalityId}
-                        >
-                          <SelectTrigger className="bg-gray-100 border-gray-300">
-                            <SelectValue placeholder="Selecciona submodalidad" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {submodalitiesByModality?.map((submodality) => (
-                              <SelectItem key={submodality.id} value={submodality.id}>
-                                {submodality.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex gap-2">
+                          <Select
+                            value={selectedSubmodalityId}
+                            onValueChange={setSelectedSubmodalityId}
+                            disabled={!selectedModalityId}
+                          >
+                            <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
+                              <SelectValue placeholder="Selecciona submodalidad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {submodalitiesByModality?.map((submodality) => (
+                                <SelectItem key={submodality.id} value={submodality.id}>
+                                  {submodality.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedSubmodalityId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedSubmodalityId("")}
+                              className="px-2"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Categoría */}
                       <div className="space-y-2">
                         <Label>Categoría (Opcional)</Label>
-                        <Select
-                          value={selectedCategoryId}
-                          onValueChange={setSelectedCategoryId}
-                          disabled={!selectedSubmodalityId}
-                        >
-                          <SelectTrigger className="bg-gray-100 border-gray-300">
-                            <SelectValue placeholder="Selecciona categoría" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categoriesBySubmodality?.map((category) => (
-                              <SelectItem key={category.id} value={category.id}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex gap-2">
+                          <Select
+                            value={selectedCategoryId}
+                            onValueChange={setSelectedCategoryId}
+                            disabled={!selectedSubmodalityId}
+                          >
+                            <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
+                              <SelectValue placeholder="Selecciona categoría" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categoriesBySubmodality?.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedCategoryId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedCategoryId("")}
+                              className="px-2"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -660,25 +747,24 @@ export default function ContentPage() {
                     {/* File Upload */}
                     {contextType === "pdf" && (
                       <div className="space-y-4">
-                        <div
-                          {...getRootProps()}
-                          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                            isDragActive
-                              ? "border-primary bg-primary/5"
-                              : "border-muted-foreground/25 hover:border-primary/50"
-                          }`}
-                        >
-                          <input {...getInputProps()} />
-                          <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">
-                            {isDragActive
-                              ? "Suelta el archivo PDF aquí..."
-                              : "Arrastra un archivo PDF aquí o haz clic para seleccionar"}
-                          </p>
-                        </div>
-
-                        {/* Uploaded Files */}
-                        {uploadedFiles.length > 0 && (
+                        {uploadedFiles.length === 0 ? (
+                          <div
+                            {...getRootProps()}
+                            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                              isDragActive
+                                ? "border-primary bg-primary/5"
+                                : "border-muted-foreground/25 hover:border-primary/50"
+                            }`}
+                          >
+                            <input {...getInputProps()} />
+                            <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">
+                              {isDragActive
+                                ? "Suelta el archivo PDF aquí..."
+                                : "Arrastra un archivo PDF aquí o haz clic para seleccionar"}
+                            </p>
+                          </div>
+                        ) : (
                           <div className="space-y-2">
                             <Label>Archivo subido:</Label>
                             <div className="space-y-2">
@@ -1567,6 +1653,66 @@ export default function ContentPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Success Dialog */}
+        <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+          <AlertDialogContent className="bg-white border-red-200">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-black">¡Pregunta creada exitosamente!</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-600">
+                La pregunta ha sido guardada correctamente. ¿Deseas ir a la página de validación?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-red-300 text-black hover:bg-red-50">
+                Quedarme aquí
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => {
+                  // Reset form
+                  setQuestion("")
+                  setContext("")
+                  setUploadedFiles([])
+                  setGeneratedResponse("")
+                  setEditableModelResponse("")
+                  setIsEditingResponse(false)
+                  setShowPreview(false)
+                  setSelectedCategoryId("")
+                  setSelectedModalityId("")
+                  setSelectedSubmodalityId("")
+                  setSelectedPath([])
+                  setCurrentQuestionId(null)
+                  setShowSuccessDialog(false)
+                  // Redirect to validation page
+                  router.push('/dashboard/validation')
+                }}
+              >
+                Ir a Validación
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Error Dialog */}
+        <AlertDialog open={showErrorDialog} onOpenChange={setShowErrorDialog}>
+          <AlertDialogContent className="bg-white border-red-200">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-black">Error</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-600">
+                {errorMessage}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => setShowErrorDialog(false)}
+              >
+                Aceptar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   )
