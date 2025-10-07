@@ -6,10 +6,21 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { User, Lock, Save, AlertCircle, CheckCircle2 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { User, Lock, Save, AlertCircle, CheckCircle2, HelpCircle, Mail, Clock, X } from "lucide-react"
+import Link from "next/link"
+import { useEffect as useReactEffect } from "react"
 import AdminLayout from "@/components/admin-layout"
 import { useAuthFetch } from "@/hooks/use-auth-fetch"
 import { API_CONFIG } from "@/lib/api-config"
+import { authService } from "@/lib/auth"
 
 // Interfaces para los datos del usuario
 interface UserProfile {
@@ -42,6 +53,19 @@ export default function SettingsPage() {
   const [profileSuccess, setProfileSuccess] = useState(false)
   const [passwordSuccess, setPasswordSuccess] = useState(false)
 
+  // Estados para cambio de email
+  const [emailChangeForm, setEmailChangeForm] = useState({
+    newEmail: '',
+    token: ''
+  })
+  const [isEmailChangeRequesting, setIsEmailChangeRequesting] = useState(false)
+  const [isEmailChangeConfirming, setIsEmailChangeConfirming] = useState(false)
+  const [showEmailChangeDialog, setShowEmailChangeDialog] = useState(false)
+  const [emailChangeTokenExpires, setEmailChangeTokenExpires] = useState<number | null>(null)
+  const [emailChangeTimeLeft, setEmailChangeTimeLeft] = useState<number>(0)
+  const [emailChangeSuccess, setEmailChangeSuccess] = useState<string | false>(false)
+  const [emailChangeError, setEmailChangeError] = useState('')
+
   const { fetchData: fetchProfile, loading: profileLoading, error: profileError } = useAuthFetch()
   const { fetchData: updateProfile, loading: updateProfileLoading, error: updateProfileError } = useAuthFetch()
   const { fetchData: updatePassword, loading: updatePasswordLoading, error: updatePasswordError } = useAuthFetch()
@@ -50,6 +74,29 @@ export default function SettingsPage() {
   useEffect(() => {
     loadUserProfile()
   }, [])
+
+  // Timer para expiración del token de cambio de email
+  useReactEffect(() => {
+    let interval: NodeJS.Timeout
+
+    if (emailChangeTokenExpires) {
+      interval = setInterval(() => {
+        const now = Date.now()
+        const timeLeft = Math.max(0, Math.floor((emailChangeTokenExpires - now) / 1000))
+        setEmailChangeTimeLeft(timeLeft)
+
+        if (timeLeft === 0) {
+          setShowEmailChangeDialog(false)
+          setEmailChangeTokenExpires(null)
+          setEmailChangeError('El código de verificación ha expirado. Solicita uno nuevo.')
+        }
+      }, 1000)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [emailChangeTokenExpires])
 
   const loadUserProfile = async () => {
     try {
@@ -69,15 +116,11 @@ export default function SettingsPage() {
     setProfileSuccess(false)
 
     try {
-      // Preparar datos para enviar (solo los campos que han cambiado o están completos)
+      // Preparar datos para enviar (solo el nombre, ya que el email se maneja por separado)
       const updateData: ProfileUpdateData = {}
-      
+
       if (profileForm.name && profileForm.name.trim() !== '') {
         updateData.name = profileForm.name.trim()
-      }
-      
-      if (profileForm.email && profileForm.email.trim() !== '') {
-        updateData.email = profileForm.email.trim()
       }
 
       const updatedProfile = await updateProfile(`${API_CONFIG.BASE_URL}/profile/me`, {
@@ -125,15 +168,115 @@ export default function SettingsPage() {
         method: 'PUT',
         body: JSON.stringify(passwordData)
       })
-      
+
       setPasswordSuccess(true)
       setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
-      
+
       // Limpiar mensaje de éxito después de 3 segundos
       setTimeout(() => setPasswordSuccess(false), 3000)
     } catch (error) {
       console.error('Error updating password:', error)
+      setPasswordSuccess(false)
     }
+  }
+
+  // Función para solicitar cambio de email
+  const handleEmailChangeRequest = async () => {
+    if (!emailChangeForm.newEmail.trim()) return
+
+    setIsEmailChangeRequesting(true)
+    setEmailChangeError('')
+
+    try {
+      console.log('📤 Requesting email change for:', emailChangeForm.newEmail.trim())
+      const response = await fetch(`${API_CONFIG.BASE_URL}/auth/email-change-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authService.getAccessToken()}`
+        },
+        body: JSON.stringify({
+          new_email: emailChangeForm.newEmail.trim()
+        })
+      })
+
+      const data = await response.json()
+      console.log('📥 Response from email change request:', data)
+
+      if (response.ok) {
+        // Calcular tiempo de expiración (24 horas desde ahora)
+        const expiresAt = Date.now() + (24 * 60 * 60 * 1000) // 24 horas
+        setEmailChangeTokenExpires(expiresAt)
+        setShowEmailChangeDialog(true)
+      } else {
+        setEmailChangeError(data.detail || data.message || 'Error al solicitar cambio de email')
+      }
+    } catch (error) {
+      console.error('Error requesting email change:', error)
+      setEmailChangeError('Error de conexión. Inténtalo nuevamente.')
+    } finally {
+      setIsEmailChangeRequesting(false)
+    }
+  }
+
+  // Función para confirmar cambio de email (Paso 2)
+  const handleEmailChangeConfirm = async () => {
+    if (!emailChangeForm.token.trim()) return
+
+    setIsEmailChangeConfirming(true)
+    setEmailChangeError('')
+
+    try {
+      console.log('🔐 Confirming email change with token:', emailChangeForm.token.trim(), 'for email:', emailChangeForm.newEmail.trim())
+      const response = await fetch(`${API_CONFIG.BASE_URL}/auth/email-change-confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authService.getAccessToken()}`
+        },
+        body: JSON.stringify({
+          token: emailChangeForm.token.trim(),
+          new_email: emailChangeForm.newEmail.trim()
+        })
+      })
+
+      const data = await response.json()
+      console.log('📥 Response from email change confirmation:', data)
+
+      if (response.ok) {
+        console.log('✅ Email change step 2 completed successfully')
+        // Mostrar mensaje de éxito para el paso 2
+        setEmailChangeSuccess('Verificación exitosa. Revisa tu nuevo correo electrónico para completar el cambio.')
+        setShowEmailChangeDialog(false)
+        setEmailChangeForm({ newEmail: '', token: '' })
+        setEmailChangeTokenExpires(null)
+
+        // Limpiar mensaje de éxito después de 10 segundos
+        setTimeout(() => setEmailChangeSuccess(false), 10000)
+      } else {
+        setEmailChangeError(data.detail || data.message || 'Código de verificación incorrecto')
+      }
+    } catch (error) {
+      console.error('Error confirming email change:', error)
+      setEmailChangeError('Error de conexión. Inténtalo nuevamente.')
+    } finally {
+      setIsEmailChangeConfirming(false)
+    }
+  }
+
+  // Función para cancelar cambio de email
+  const handleCancelEmailChange = () => {
+    setShowEmailChangeDialog(false)
+    setEmailChangeForm({ newEmail: '', token: '' })
+    setEmailChangeTokenExpires(null)
+    setEmailChangeError('')
+  }
+
+  // Función para formatear tiempo restante
+  const formatTimeLeft = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
   return (
@@ -198,36 +341,15 @@ export default function SettingsPage() {
                       id="email"
                       type="email"
                       value={profileForm.email || ''}
-                      onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="tu@email.com"
-                      className={`bg-background/50 border-gray-300 focus:border-red-400 ${
-                        profileForm.email &&
-                        !isValidEmail(profileForm.email)
-                          ? 'border-red-500 focus:border-red-500'
-                          : profileForm.email &&
-                            isValidEmail(profileForm.email)
-                            ? 'border-green-500 focus:border-green-500'
-                            : ''
-                      }`}
-                      required
+                      className="bg-muted border-gray-300 text-muted-foreground cursor-not-allowed"
+                      disabled
+                      readOnly
                     />
-                    {profileForm.email && !isValidEmail(profileForm.email) && (
-                      <p className="text-xs text-red-500 flex items-center">
-                        <AlertCircle className="h-3 w-3 mr-1" />
-                        Por favor ingresa un correo electrónico válido
-                      </p>
-                    )}
-                    {profileForm.email && isValidEmail(profileForm.email) && (
-                      <p className="text-xs text-green-600 flex items-center">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Correo electrónico válido
-                      </p>
-                    )}
-                    {!profileForm.email && (
-                      <p className="text-xs text-muted-foreground">
-                        Asegúrate de usar un correo válido y accesible
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground flex items-center">
+                      <Mail className="h-3 w-3 mr-1" />
+                      Para cambiar tu correo electrónico, usa la sección "Cambio de Correo Electrónico" abajo
+                    </p>
                   </div>
 
                   {userProfile && (
@@ -246,8 +368,7 @@ export default function SettingsPage() {
                     className="w-full bg-red-600 hover:bg-red-700 text-white"
                     disabled={Boolean(
                       updateProfileLoading ||
-                      (isFieldEmpty(profileForm.name) && isFieldEmpty(profileForm.email)) ||
-                      (profileForm.email && !isValidEmail(profileForm.email))
+                      isFieldEmpty(profileForm.name)
                     )}
                   >
                     {updateProfileLoading ? (
@@ -305,6 +426,15 @@ export default function SettingsPage() {
                     className="bg-background/50 border-gray-300 focus:border-red-400"
                     required
                   />
+                  <div className="flex items-center justify-end">
+                    <Link
+                      href="/forgot-password"
+                      className="inline-flex items-center text-xs text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <HelpCircle className="h-3 w-3 mr-1" />
+                      ¿No recuerdas tu contraseña?
+                    </Link>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -384,7 +514,150 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Cambio de Email */}
+        <Card className="backdrop-blur-sm bg-card/80 border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Mail className="h-5 w-5" />
+              <span>Cambio de Correo Electrónico</span>
+            </CardTitle>
+            <CardDescription>Cambia tu dirección de correo electrónico con verificación de seguridad</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {emailChangeSuccess && (
+              <Alert className="border-green-200 bg-green-50 mb-6">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  {typeof emailChangeSuccess === 'string' ? emailChangeSuccess : '¡Correo electrónico actualizado exitosamente! Recuerda que mantendrás la misma contraseña.'}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="newEmail">Nuevo Correo Electrónico</Label>
+                <Input
+                  id="newEmail"
+                  type="email"
+                  placeholder="nuevo@email.com"
+                  value={emailChangeForm.newEmail}
+                  onChange={(e) => setEmailChangeForm(prev => ({ ...prev, newEmail: e.target.value }))}
+                  className="bg-background/50 border-gray-300 focus:border-red-400"
+                  disabled={isEmailChangeRequesting}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se enviará un código de verificación a tu correo actual
+                </p>
+              </div>
+
+              <Button
+                onClick={handleEmailChangeRequest}
+                disabled={!emailChangeForm.newEmail.trim() || isEmailChangeRequesting}
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isEmailChangeRequesting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Enviando código...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Solicitar Cambio de Email
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Dialog para confirmación de cambio de email */}
+      <Dialog open={showEmailChangeDialog} onOpenChange={setShowEmailChangeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Mail className="h-5 w-5" />
+              <span>Verificar Cambio de Email</span>
+            </DialogTitle>
+            <DialogDescription>
+              Hemos enviado un código de verificación a tu correo actual.
+              Ingresa el código para continuar con el proceso de cambio de email.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {emailChangeError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{emailChangeError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="emailToken">Código de Verificación</Label>
+              <Input
+                id="emailToken"
+                type="text"
+                placeholder="Ingresa el código de verificación"
+                value={emailChangeForm.token}
+                onChange={(e) => setEmailChangeForm(prev => ({ ...prev, token: e.target.value }))}
+                className="bg-background/50 border-gray-300 focus:border-red-400 text-center text-lg tracking-widest"
+                maxLength={20}
+                disabled={isEmailChangeConfirming}
+              />
+            </div>
+
+            {emailChangeTimeLeft > 0 && (
+              <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span>Código expira en: {formatTimeLeft(emailChangeTimeLeft)}</span>
+              </div>
+            )}
+
+            <Alert>
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Proceso de cambio de email:</strong><br />
+                1. Ingresa el código enviado a tu email actual<br />
+                2. Después de verificar, recibirás un email en tu nueva dirección<br />
+                3. Haz clic en el enlace del email para completar el cambio<br />
+                <em>Mantendrás la misma contraseña.</em>
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <DialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2">
+            <Button
+              variant="outline"
+              onClick={handleCancelEmailChange}
+              disabled={isEmailChangeConfirming}
+              className="w-full sm:w-auto"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEmailChangeConfirm}
+              disabled={!emailChangeForm.token.trim() || isEmailChangeConfirming}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700"
+            >
+              {isEmailChangeConfirming ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Verificando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Confirmar Cambio
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   )
 }

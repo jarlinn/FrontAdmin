@@ -35,7 +35,9 @@ export function useAuthFetch(options: UseAuthFetchOptions = {}): UseAuthFetchRet
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         const errorMessage = errorData.detail || errorData.message || `Error ${response.status}: ${response.statusText}`
-        throw new Error(errorMessage)
+        const error = new Error(errorMessage)
+        ;(error as any).status = response.status
+        throw error
       }
 
       const responseData = await response.json()

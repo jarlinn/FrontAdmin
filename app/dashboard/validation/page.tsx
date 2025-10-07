@@ -55,11 +55,11 @@ import AdminLayout from "@/components/admin-layout"
 import { useDropzone } from "react-dropzone"
 import { useQuestions } from "@/hooks/use-questions"
 import { Question, QuestionFilters, UpdateQuestionRequest } from "@/lib/questions"
-import { useCategoriesTree } from "@/hooks/use-categories"
 import { useModalities } from "@/hooks/use-modalities"
 import { useSubmodalities, useSubmodalitiesByModality } from "@/hooks/use-submodalities"
-import { CategoryTree } from "@/lib/categories"
+import { useNewCategories, useCategoriesBySubmodality } from "@/hooks/use-new-categories"
 import { Modality } from "@/lib/modalities"
+import { NewCategory } from "@/lib/new-categories"
 import { authService } from "@/lib/auth"
 import { buildApiUrl } from "@/lib/api-config"
 
@@ -86,20 +86,26 @@ export default function ValidationPage() {
 
   // Hooks para datos reales
   const { questions, pagination, loading, error, refreshQuestions, updateQuestionStatus, updateQuestion, recalculateQuestion, deleteQuestion, applyFilters, goToPage } = useQuestions()
-  const { categoriesTree, loading: categoriesTreeLoading, error: categoriesTreeError, refreshCategoriesTree } = useCategoriesTree()
+
+  // Filtrar preguntas únicas por question_id
+  const uniqueQuestions = useMemo(() => {
+    const seen = new Set()
+    return questions.filter(q => {
+      if (seen.has(q.question_id)) return false
+      seen.add(q.question_id)
+      return true
+    })
+  }, [questions])
   const { modalities, loading: modalitiesLoading } = useModalities()
   const { submodalities: submodalitiesByModality, loading: submodalitiesByModalityLoading } = useSubmodalitiesByModality(modalityFilter !== "all" ? modalityFilter : "")
+  const { categories: categoriesBySubmodality, loading: categoriesBySubmodalityLoading } = useCategoriesBySubmodality(submodalityFilter !== "all" ? submodalityFilter : "")
   
+// Estados para selector de categorías
+const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false)
 
-  // Estados para selector desplegable de categorías
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
-  const [selectedPath, setSelectedPath] = useState<CategoryTree[]>([])
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-
-  
-  
-  const [editingItem, setEditingItem] = useState<Question | null>(null)
+const [editingItem, setEditingItem] = useState<Question | null>(null)
   const [deletingItem, setDeletingItem] = useState<Question | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isReprocessing, setIsReprocessing] = useState<string | null>(null)
   
   // Estados para edición
@@ -107,24 +113,25 @@ export default function ValidationPage() {
   const [editedModelResponse, setEditedModelResponse] = useState("")
   const [editedContextText, setEditedContextText] = useState("")
   const [editedContextType, setEditedContextType] = useState<"text" | "pdf">("text")
+  const [editedModalityId, setEditedModalityId] = useState("")
+  const [editedSubmodalityId, setEditedSubmodalityId] = useState("")
   const [editedCategoryId, setEditedCategoryId] = useState("")
   const [editUploadedFiles, setEditUploadedFiles] = useState<EditUploadedFile[]>([])
   const [isSaving, setIsSaving] = useState(false)
-  
-  // Estados para selector de árbol de categorías en edición
-  const [editExpandedCategories, setEditExpandedCategories] = useState<Set<string>>(new Set())
-  const [editSelectedPath, setEditSelectedPath] = useState<CategoryTree[]>([])
-  const [isEditTreeSelectorOpen, setIsEditTreeSelectorOpen] = useState(false)
-  const editTreeSelectorRef = useRef<HTMLDivElement>(null)
   const [previewingDocument, setPreviewingDocument] = useState<Question | null>(null)
   const [documentUrl, setDocumentUrl] = useState<string | null>(null)
   const [documentLoading, setDocumentLoading] = useState(false)
   const [documentError, setDocumentError] = useState<string | null>(null)
-  const [approvingQuestion, setApprovingQuestion] = useState<string | null>(null)
+  const [activatingQuestion, setActivatingQuestion] = useState<string | null>(null)
   const [rejectingQuestion, setRejectingQuestion] = useState<string | null>(null)
+  const [disablingQuestion, setDisablingQuestion] = useState<string | null>(null)
   const [recalculatingQuestion, setRecalculatingQuestion] = useState<string | null>(null)
   const [expandedResponses, setExpandedResponses] = useState<Set<string>>(new Set())
   const [truncatedResponses, setTruncatedResponses] = useState<Set<string>>(new Set())
+
+  // Hooks para edición jerárquica
+  const { submodalities: editSubmodalitiesByModality, loading: editSubmodalitiesByModalityLoading } = useSubmodalitiesByModality(editedModalityId || "")
+  const { categories: editCategoriesBySubmodality, loading: editCategoriesBySubmodalityLoading } = useCategoriesBySubmodality(editedSubmodalityId || "")
 
   // Función para detectar si el contenido está truncado
   const checkIfTruncated = (element: HTMLElement) => {
@@ -151,19 +158,11 @@ export default function ValidationPage() {
       filters.status = statusFilter as "PENDING" | "APPROVED" | "DISABLED" | "all"
 
       // Nuevos filtros jerárquicos
-      if (modalityFilter !== "all") {
-        filters.modality_id = modalityFilter
-      }
-      if (submodalityFilter !== "all") {
-        filters.submodality_id = submodalityFilter
-      }
-      if (categoryFilter !== "all") {
-        filters.category_id = categoryFilter
-      }
+      filters.modality_id = modalityFilter === "all" ? "" : modalityFilter
+      filters.submodality_id = submodalityFilter === "all" ? "" : submodalityFilter
+      filters.category_id = categoryFilter === "all" ? "" : categoryFilter
 
-      if (searchTerm.trim()) {
-        filters.search = searchTerm.trim()
-      }
+      filters.search = searchTerm.trim()
 
       console.log('🔍 Enviando filtros al backend:', filters)
 
@@ -175,150 +174,24 @@ export default function ValidationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, statusFilter, modalityFilter, submodalityFilter, categoryFilter])
 
-  // Cerrar selector de árbol al hacer clic fuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (editTreeSelectorRef.current && !editTreeSelectorRef.current.contains(event.target as Node)) {
-        setIsEditTreeSelectorOpen(false)
-      }
-    }
-
-    if (isEditTreeSelectorOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isEditTreeSelectorOpen])
 
 
-  const getLevelIndicator = (level: number) => {
-    if (level === 0) return ""
-    if (level === 1) return "└─ "
-    // Para niveles más profundos, usar espacios y líneas para mostrar jerarquía
-    return "└─ "
-  }
-
-  // Función para aplanar el árbol de categorías con indicadores visuales
-  const flattenCategoriesTree = (categories: CategoryTree[], level: number = 0): Array<{id: string, name: string, level: number}> => {
-    const flattened: Array<{id: string, name: string, level: number}> = []
-    
-    categories.forEach(category => {
-      // Agregar la categoría actual
-      flattened.push({
-        id: category.id,
-        name: category.name,
-        level: level
-      })
-      
-      // Si tiene hijos, agregarlos recursivamente
-      if (category.children && category.children.length > 0) {
-        flattened.push(...flattenCategoriesTree(category.children, level + 1))
-      }
+  // Función para obtener el full_path de una categoría por ID
+  const getCategoryFullPath = (question: Question): string => {
+    // Debug: Log what we're receiving
+    console.log('🔍 Question data for display:', {
+      question_id: question.question_id,
+      full_name: question.full_name,
+      category_name: question.category_name,
+      modality_id: question.modality_id,
+      submodality_id: question.submodality_id,
+      category_id: question.category_id
     })
-    
-    return flattened
+
+    // Use the full_name field provided by the backend
+    return question.full_name || question.category_name || "Sin categoría"
   }
 
-  // Obtener categorías aplanadas para el Select
-  const flattenedCategories = categoriesTree ? flattenCategoriesTree(categoriesTree) : []
-
-  // Funciones para el selector desplegable de categorías
-  const toggleCategoryExpansion = (categoryId: string) => {
-    const newExpanded = new Set(expandedCategories)
-    if (newExpanded.has(categoryId)) {
-      newExpanded.delete(categoryId)
-    } else {
-      newExpanded.add(categoryId)
-    }
-    setExpandedCategories(newExpanded)
-  }
-
-  const selectCategory = (category: CategoryTree | null, path: CategoryTree[]) => {
-    if (category) {
-      setCategoryFilter(category.id)
-      setSelectedPath([...path, category])
-    } else {
-      // Seleccionar "Todas las categorías"
-      setCategoryFilter("all")
-      setSelectedPath([])
-    }
-    setIsDropdownOpen(false)
-  }
-
-  const getSelectedCategoryDisplay = () => {
-    if (selectedPath.length === 0) {
-      // Si no hay path seleccionado pero hay un filtro, buscar la categoría en el árbol
-      if (categoryFilter !== "all" && categoriesTree) {
-        const findCategoryPath = (categories: CategoryTree[], targetId: string, path: CategoryTree[] = []): CategoryTree[] | null => {
-          for (const category of categories) {
-            if (category.id === targetId) {
-              return [...path, category]
-            }
-            if (category.children.length > 0) {
-              const childPath = findCategoryPath(category.children, targetId, [...path, category])
-              if (childPath) return childPath
-            }
-          }
-          return null
-        }
-        
-        const path = findCategoryPath(categoriesTree, categoryFilter)
-        if (path) {
-          return path.map(cat => cat.name).join(" > ")
-        }
-      }
-      return "Todas las categorías"
-    }
-    return selectedPath.map(cat => cat.name).join(" > ")
-  }
-
-  // Función para renderizar el árbol de categorías expandible
-  const renderExpandableCategoryTree = (categories: CategoryTree[], path: CategoryTree[] = [], level: number = 0) => {
-    return categories.map((category) => (
-      <div key={category.id}>
-        <div className="flex items-center space-x-2 py-2 px-2 hover:bg-red-50 rounded-md cursor-pointer">
-          {category.children.length > 0 ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleCategoryExpansion(category.id)
-              }}
-              className="flex items-center justify-center w-4 h-4"
-            >
-              {expandedCategories.has(category.id) ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          ) : (
-            <div className="w-4 h-4" />
-          )}
-          <button
-            onClick={() => selectCategory(category, path)}
-            className="flex-1 text-left text-sm hover:text-red-900"
-            style={{ marginLeft: `${level * 12}px` }}
-          >
-            <span className={categoryFilter === category.id ? "font-medium text-red-900" : ""}>
-              {category.name}
-            </span>
-            {category.questions_count > 0 && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                {category.questions_count}
-              </Badge>
-            )}
-          </button>
-        </div>
-        {expandedCategories.has(category.id) && category.children.length > 0 && (
-          <div className="ml-4">
-            {renderExpandableCategoryTree(category.children, [...path, category], level + 1)}
-          </div>
-        )}
-      </div>
-    ))
-  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -349,49 +222,6 @@ export default function ValidationPage() {
   }
 
 
-  // Funciones para el selector de árbol de categorías en edición
-  const toggleEditCategoryExpansion = (categoryId: string) => {
-    const newExpanded = new Set(editExpandedCategories)
-    if (newExpanded.has(categoryId)) {
-      newExpanded.delete(categoryId)
-    } else {
-      newExpanded.add(categoryId)
-    }
-    setEditExpandedCategories(newExpanded)
-  }
-
-  const selectEditCategory = (category: CategoryTree, path: CategoryTree[]) => {
-    setEditedCategoryId(category.id)
-    setEditSelectedPath([...path, category])
-    setIsEditTreeSelectorOpen(false)
-  }
-
-  const getEditSelectedCategoryDisplay = () => {
-    if (editSelectedPath.length === 0) {
-      // Buscar la categoría actual en el árbol
-      const findCategoryPath = (categories: CategoryTree[], targetId: string, path: CategoryTree[] = []): CategoryTree[] | null => {
-        for (const category of categories) {
-          if (category.id === targetId) {
-            return [...path, category]
-          }
-          if (category.children.length > 0) {
-            const childPath = findCategoryPath(category.children, targetId, [...path, category])
-            if (childPath) return childPath
-          }
-        }
-        return null
-      }
-      
-      if (editedCategoryId && categoriesTree) {
-        const path = findCategoryPath(categoriesTree, editedCategoryId)
-        if (path) {
-          return path.map(cat => cat.name).join(" > ")
-        }
-      }
-      return "Selecciona una categoría"
-    }
-    return editSelectedPath.map(cat => cat.name).join(" > ")
-  }
 
   // Funciones para manejar archivos en edición
   const onEditFileDrop = useCallback((acceptedFiles: File[]) => {
@@ -427,21 +257,29 @@ export default function ValidationPage() {
   }
 
   const handleEdit = (question: Question) => {
+    // Debug: Log what we're loading for edit
+    console.log('📝 Loading question for edit:', {
+      question_id: question.question_id,
+      full_name: question.full_name,
+      category_name: question.category_name,
+      modality_id: question.modality_id,
+      submodality_id: question.submodality_id,
+      category_id: question.category_id,
+      question_text: question.question_text
+    })
+
     setEditingItem(question)
     // Inicializar los campos con los valores actuales
     setEditedQuestionText(question.question_text)
     setEditedModelResponse(question.model_response || question.response || "")
     setEditedContextText(question.context_text || "")
     setEditedContextType(question.context_type)
+    setEditedModalityId(question.modality_id || "")
+    setEditedSubmodalityId(question.submodality_id || "")
     setEditedCategoryId(question.category_id)
-    
+
     // Limpiar archivos subidos
     setEditUploadedFiles([])
-    
-    // Resetear el selector de árbol
-    setEditSelectedPath([])
-    setEditExpandedCategories(new Set())
-    setIsEditTreeSelectorOpen(false)
   }
 
   const handleSaveEdit = async () => {
@@ -452,12 +290,34 @@ export default function ValidationPage() {
       
       // Siempre usar FormData según el nuevo formato del backend
       const formData = new FormData()
-      
+
       // Agregar campos básicos
       formData.append('question_text', editedQuestionText)
       formData.append('model_response', editedModelResponse)
       formData.append('context_type', editedContextType)
       formData.append('category_id', editedCategoryId)
+      if (editedModalityId) {
+        formData.append('modality_id', editedModalityId)
+      }
+      if (editedSubmodalityId) {
+        formData.append('submodality_id', editedSubmodalityId)
+      }
+
+      // Debug: Log what we're sending
+      console.log('🔄 Enviando actualización de pregunta:', {
+        question_text: editedQuestionText,
+        model_response: editedModelResponse,
+        context_type: editedContextType,
+        category_id: editedCategoryId,
+        modality_id: editedModalityId,
+        submodality_id: editedSubmodalityId
+      })
+
+      // Log FormData contents
+      console.log('📝 FormData contents:')
+      for (const [key, value] of formData.entries()) {
+        console.log(`  ${key}: ${value}`)
+      }
       
       // Agregar contexto según el tipo
       if (editedContextType === "text") {
@@ -468,9 +328,12 @@ export default function ValidationPage() {
       }
       
       // Actualizar la pregunta en el backend
-      await updateQuestion(editingItem.question_id, formData)
-      
+      console.log('📡 Enviando actualización al backend...')
+      const updatedQuestion = await updateQuestion(editingItem.question_id, formData)
+      console.log('✅ Respuesta del backend:', updatedQuestion)
+
       // Refrescar la lista completa para asegurar sincronización
+      console.log('🔄 Refrescando lista de preguntas...')
       await refreshQuestions()
 
       // Cerrar el diálogo
@@ -489,19 +352,18 @@ export default function ValidationPage() {
     setEditedModelResponse("")
     setEditedContextText("")
     setEditedContextType("text")
+    setEditedModalityId("")
+    setEditedSubmodalityId("")
     setEditedCategoryId("")
-    
+
     // Limpiar archivos y liberar memoria
     editUploadedFiles.forEach(file => URL.revokeObjectURL(file.preview))
     setEditUploadedFiles([])
-    
-    setEditSelectedPath([])
-    setEditExpandedCategories(new Set())
-    setIsEditTreeSelectorOpen(false)
   }
 
   const handleDelete = (question: Question) => {
     setDeletingItem(question)
+    setIsDeleteDialogOpen(true)
   }
 
   const confirmDelete = async () => {
@@ -509,8 +371,13 @@ export default function ValidationPage() {
       try {
         await deleteQuestion(deletingItem.question_id)
         setDeletingItem(null)
+        setIsDeleteDialogOpen(false)
+        // Quick reload to prevent empty container
+        window.location.reload()
       } catch (error) {
         console.error("Error al eliminar pregunta:", error)
+        setDeletingItem(null)
+        setIsDeleteDialogOpen(false)
       }
     }
   }
@@ -531,23 +398,24 @@ export default function ValidationPage() {
     try {
       // Establecer el estado de carga apropiado
       if (newStatus === "APPROVED") {
-        setApprovingQuestion(questionId)
-      } else {
-        setRejectingQuestion(questionId)
+        setActivatingQuestion(questionId)
+      } else if (newStatus === "DISABLED") {
+        setDisablingQuestion(questionId)
       }
 
       await updateQuestionStatus(questionId, newStatus)
-      
+
       // Opcional: mostrar mensaje de éxito
-      console.log(`Pregunta ${newStatus === "APPROVED" ? "aprobada" : "rechazada"} exitosamente`)
-      
+      console.log(`Pregunta ${newStatus === "APPROVED" ? "activada" : "deshabilitada"} exitosamente`)
+
     } catch (error) {
       console.error("Error al actualizar estado:", error)
       // Aquí podrías mostrar un toast o notificación de error
     } finally {
       // Limpiar estados de carga
-      setApprovingQuestion(null)
+      setActivatingQuestion(null)
       setRejectingQuestion(null)
+      setDisablingQuestion(null)
     }
   }
 
@@ -622,45 +490,6 @@ export default function ValidationPage() {
   }
 
 
-  // Función para renderizar el árbol de categorías en edición
-  const renderEditCategoryTree = (categories: CategoryTree[], path: CategoryTree[] = [], level: number = 0) => {
-    return categories.map((category) => (
-      <div key={category.id} style={{ marginLeft: `${level * 16}px` }}>
-        <div className="flex items-center space-x-2 py-2 px-2 rounded-md cursor-pointer">
-          {category.children.length > 0 ? (
-            <button
-              onClick={() => toggleEditCategoryExpansion(category.id)}
-              className="flex items-center justify-center w-4 h-4"
-            >
-              {editExpandedCategories.has(category.id) ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          ) : (
-            <div className="w-4 h-4" />
-          )}
-          <button
-            onClick={() => selectEditCategory(category, path)}
-            className="flex-1 text-left text-sm hover:text-red-900"
-          >
-            <span className={editedCategoryId === category.id ? "font-medium text-primary" : ""}>
-              {category.name}
-            </span>
-            {category.questions_count > 0 && (
-              <span className="text-xs text-muted-foreground ml-2">({category.questions_count})</span>
-            )}
-          </button>
-        </div>
-        {editExpandedCategories.has(category.id) && category.children.length > 0 && (
-          <div>
-            {renderEditCategoryTree(category.children, [...path, category], level + 1)}
-          </div>
-        )}
-      </div>
-    ))
-  }
 
   return (
     <AdminLayout>
@@ -760,47 +589,25 @@ export default function ValidationPage() {
 
                 <div className="space-y-2">
                   <Label className="text-sm">Categoría</Label>
-                  <Popover open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between bg-background/50 h-10"
-                        disabled={categoriesTreeLoading || submodalityFilter === "all"}
-                      >
-                        <span className="truncate">
-                          {categoriesTreeLoading ? "Cargando categorías..." : getSelectedCategoryDisplay()}
-                        </span>
-                        <ChevronDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-2 max-h-60 overflow-y-auto" align="start">
-                      {/* Opción "Todas las categorías" */}
-                      <div className="py-2 px-2 hover:bg-red-50 rounded-md cursor-pointer">
-                        <button
-                          onClick={() => selectCategory(null, [])}
-                          className="w-full text-left text-sm"
-                        >
-                          <span className={categoryFilter === "all" ? "font-medium text-red-900" : ""}>
-                            Todas las categorías
-                          </span>
-                        </button>
-                      </div>
-
-                      {/* Separador */}
-                      {categoriesTree && categoriesTree.length > 0 && (
-                        <div className="border-t border-border my-2" />
-                      )}
-
-                      {/* Árbol de categorías expandible */}
-                      {categoriesTree && categoriesTree.length > 0 ? (
-                        renderExpandableCategoryTree(categoriesTree)
-                      ) : (
-                        <div className="text-sm text-muted-foreground p-2">
-                          No hay categorías disponibles
-                        </div>
-                      )}
-                    </PopoverContent>
-                  </Popover>
+                  <Select
+                    value={categoryFilter}
+                    onValueChange={setCategoryFilter}
+                    disabled={categoriesBySubmodalityLoading || submodalityFilter === "all"}
+                  >
+                    <SelectTrigger className="bg-background/50 h-10 focus:ring-red-300 focus:ring-2">
+                      <SelectValue placeholder={categoriesBySubmodalityLoading ? "Cargando categorías..." : "Todas las categorías"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="focus:bg-red-50 focus:text-red-900">
+                        Todas las categorías
+                      </SelectItem>
+                      {categoriesBySubmodality?.map((category) => (
+                        <SelectItem key={category.id} value={category.id} className="focus:bg-red-50 focus:text-red-900">
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -842,7 +649,7 @@ export default function ValidationPage() {
                   Estado
                 </div>
                 <div className="col-span-2 lg:col-span-2 xl:col-span-1 text-sm font-medium text-muted-foreground">
-                  Categoría / Doc
+                  Modalidad / Doc
                 </div>
                 <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground text-right">
                   Acciones
@@ -851,7 +658,7 @@ export default function ValidationPage() {
 
               {/* Filas de datos */}
               <div className="space-y-3 p-4">
-                {questions.map((question) => (
+                {uniqueQuestions.map((question) => (
                   <Card
                     key={question.question_id}
                     className="bg-white border-gray-200 hover:bg-gray-50 transition-all duration-200 hover:shadow-md"
@@ -928,7 +735,7 @@ export default function ValidationPage() {
                           <div className="flex flex-wrap items-center gap-2 text-xs">
                             {getStatusBadge(question.status)}
                             <Badge variant="outline" className="text-xs">
-                              {question.category_name}
+                              {getCategoryFullPath(question)}
                             </Badge>
                             <Badge 
                               variant={question.context_type === "pdf" ? "default" : "secondary"} 
@@ -968,7 +775,7 @@ export default function ValidationPage() {
                     {/* Columna: Categoría (con Doc abajo) */}
                     <div className="hidden md:flex md:col-span-2 lg:col-span-2 xl:col-span-1 flex-col justify-start space-y-1">
                       <Badge variant="outline" className="text-xs w-fit">
-                        {question.category_name}
+                        {getCategoryFullPath(question)}
                       </Badge>
                       <Badge 
                         variant={question.context_type === "pdf" ? "default" : "secondary"} 
@@ -990,82 +797,131 @@ export default function ValidationPage() {
                     </div>
 
                     {/* Columna: Acciones */}
-                    <div className="md:col-span-2 lg:col-span-2 xl:col-span-2 flex flex-col md:items-end space-y-2">
-                      {question.status === "PENDING" && (
-                        <div className="flex flex-col space-y-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusChange(question.question_id, "APPROVED")}
-                            disabled={approvingQuestion === question.question_id || rejectingQuestion === question.question_id}
-                            className="text-green-600 hover:text-green-700 hover:border-green-600 h-7 px-3 w-20"
-                          >
-                            {approvingQuestion === question.question_id ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            ) : (
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                            )}
-                            <span className="text-xs">
-                              {approvingQuestion === question.question_id ? "Aprobando..." : "Aprobar"}
-                            </span>
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusChange(question.question_id, "DISABLED")}
-                            disabled={approvingQuestion === question.question_id || rejectingQuestion === question.question_id}
-                            className="text-red-600 hover:text-red-700 hover:border-red-600 h-7 px-3 w-20"
-                          >
-                            {rejectingQuestion === question.question_id ? (
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            ) : (
-                              <XCircle className="h-3 w-3 mr-1" />
-                            )}
-                            <span className="text-xs">
-                              {rejectingQuestion === question.question_id ? "Rechazando..." : "Rechazar"}
-                            </span>
-                          </Button>
-                        </div>
-                      )}
-                      <div className="flex items-center space-x-1">
-                        {question.status !== "DISABLED" && (
-                          <Button 
-                            size="sm" 
-                            variant="ghost" 
-                            onClick={() => handleEdit(question)} 
-                            className="h-7 w-7 p-0"
-                            title="Ver detalles"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                        )}
+                  <div className="md:col-span-2 lg:col-span-2 xl:col-span-2 flex flex-col md:items-end space-y-2">
+                    {question.status === "PENDING" && (
+                      <div className="flex flex-col space-y-1" key="pending-actions">
                         <Button
                           size="sm"
-                          variant="ghost"
-                          onClick={() => handleReprocess(question)}
-                          disabled={isReprocessing === question.question_id}
-                          className="h-7 w-7 p-0"
-                          title="Reprocesar"
+                          variant="outline"
+                          onClick={() => handleStatusChange(question.question_id, "APPROVED")}
+                          disabled={activatingQuestion === question.question_id || rejectingQuestion === question.question_id}
+                          className="text-green-600 hover:text-green-700 hover:border-green-600 h-7 px-3 w-20"
                         >
-                          {isReprocessing === question.question_id ? (
+                          {activatingQuestion === question.question_id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                          )}
+                          <span className="text-xs">
+                            {activatingQuestion === question.question_id ? "Aprobando..." : "Aprobar"}
+                          </span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusChange(question.question_id, "DISABLED")}
+                          disabled={activatingQuestion === question.question_id || rejectingQuestion === question.question_id}
+                          className="text-red-600 hover:text-red-700 hover:border-red-600 h-7 px-3 w-20"
+                        >
+                          {rejectingQuestion === question.question_id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <XCircle className="h-3 w-3 mr-1" />
+                          )}
+                          <span className="text-xs">
+                            {rejectingQuestion === question.question_id ? "Rechazando..." : "Rechazar"}
+                          </span>
+                        </Button>
+                      </div>
+                    )}
+                    {question.status === "DISABLED" && (
+                      <div className="flex flex-col space-y-1" key="disabled-actions">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusChange(question.question_id, "APPROVED")}
+                          disabled={activatingQuestion === question.question_id}
+                          className="text-green-600 hover:text-green-700 hover:border-green-600 h-7 px-3 w-20"
+                        >
+                          {activatingQuestion === question.question_id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                          )}
+                          <span className="text-xs">
+                            {activatingQuestion === question.question_id ? "Activando..." : "Activar"}
+                          </span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDelete(question)}
+                          className="text-red-600 hover:text-red-700 hover:border-red-600 h-7 px-3 w-20"
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          <span className="text-xs">Eliminar</span>
+                        </Button>
+                      </div>
+                    )}
+                    <div className="flex items-center space-x-1">
+                      {question.status !== "DISABLED" && (
+                        <Button
+                          key="edit"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEdit(question)}
+                          className="h-7 w-7 p-0"
+                          title="Ver detalles"
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button
+                        key="reprocess"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleReprocess(question)}
+                        disabled={isReprocessing === question.question_id}
+                        className="h-7 w-7 p-0"
+                        title="Reprocesar"
+                      >
+                        {isReprocessing === question.question_id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3" />
+                        )}
+                      </Button>
+                      {question.status === "APPROVED" && (
+                        <Button
+                          key="disable"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleStatusChange(question.question_id, "DISABLED")}
+                          disabled={disablingQuestion === question.question_id}
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                          title="Deshabilitar"
+                        >
+                          {disablingQuestion === question.question_id ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
-                            <RefreshCw className="h-3 w-3" />
+                            <XCircle className="h-3 w-3" />
                           )}
                         </Button>
-                        {question.status !== "DISABLED" && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDelete(question)}
-                            className="text-destructive hover:text-destructive h-7 w-7 p-0"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
+                      )}
+                      {question.status !== "DISABLED" && (
+                        <Button
+                          key="delete"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(question)}
+                          className="text-destructive hover:text-destructive h-7 w-7 p-0"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
+                  </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1179,34 +1035,73 @@ export default function ValidationPage() {
                   />
                 </div>
 
+                {/* Modalidad */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Modalidad *</Label>
+                  <Select
+                    value={editedModalityId}
+                    onValueChange={(value) => {
+                      setEditedModalityId(value)
+                      setEditedSubmodalityId("") // Reset submodality when modality changes
+                      setEditedCategoryId("") // Reset category when modality changes
+                    }}
+                  >
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Selecciona una modalidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modalities?.map((modality) => (
+                        <SelectItem key={modality.id} value={modality.id}>
+                          {modality.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Submodalidad */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Submodalidad</Label>
+                  <Select
+                    value={editedSubmodalityId}
+                    onValueChange={(value) => {
+                      setEditedSubmodalityId(value)
+                      setEditedCategoryId("") // Reset category when submodality changes
+                    }}
+                    disabled={!editedModalityId || editSubmodalitiesByModalityLoading}
+                  >
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Selecciona una submodalidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editSubmodalitiesByModality?.map((submodality) => (
+                        <SelectItem key={submodality.id} value={submodality.id}>
+                          {submodality.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Categoría */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Categoría *</Label>
-                  <div className="relative" ref={editTreeSelectorRef}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsEditTreeSelectorOpen(!isEditTreeSelectorOpen)}
-                      className="w-full justify-between bg-background/50"
-                    >
-                      <span className="truncate">{getEditSelectedCategoryDisplay()}</span>
-                      <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                    
-                    {isEditTreeSelectorOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md max-h-60 overflow-y-auto">
-                        <div className="p-2">
-                          {categoriesTree && categoriesTree.length > 0 ? (
-                            renderEditCategoryTree(categoriesTree)
-                          ) : (
-                            <div className="text-sm text-muted-foreground p-2">
-                              No hay categorías disponibles
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <Select
+                    value={editedCategoryId}
+                    onValueChange={setEditedCategoryId}
+                    disabled={!editedSubmodalityId || editCategoriesBySubmodalityLoading}
+                  >
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editCategoriesBySubmodality?.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Tipo de Contexto */}
@@ -1386,7 +1281,10 @@ export default function ValidationPage() {
           </DialogContent>
         </Dialog>
 
-        <AlertDialog open={!!deletingItem} onOpenChange={() => setDeletingItem(null)}>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open)
+          if (!open) setDeletingItem(null)
+        }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>

@@ -86,22 +86,38 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center p-4">
-        {/* Background glassmorphism effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+      <div className="min-h-screen bg-white flex flex-col">
+        {/* Header section with logo and title stacked vertically */}
+        <div className="bg-red-600 text-white py-4 px-4 md:py-6">
+          <div className="max-w-6xl mx-auto flex flex-col items-center space-y-3">
+            {/* UFPS Logo centered at top */}
+            <img
+              src="/ufpslogo.png"
+              alt="UFPS Logo"
+              className="h-12 md:h-16 lg:h-20 w-auto"
+            />
 
-        <div className="w-full max-w-md relative">
-          {/* University Logo Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 backdrop-blur-sm rounded-full mb-4 border border-primary/20">
-              <GraduationCap className="w-8 h-8 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Sistema de Administración</h1>
-            <p className="text-muted-foreground">Chatbot Universitario - Ingeniería de Sistemas</p>
+            {/* Title below the logo */}
+            <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-extrabold text-center text-white tracking-wide drop-shadow-lg leading-tight">
+              Sistema de Información de Modalidades de Trabajos de Grado
+            </h1>
           </div>
+        </div>
 
-          {/* Success Card */}
-          <Card className="backdrop-blur-md bg-card/80 border-border/50 shadow-xl">
+        {/* Main content */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            {/* University Logo Header */}
+            <div className="text-center mb-8">
+              <img
+                src="/logo_ingsistemas.png"
+                alt="Ingeniería de Sistemas Logo"
+                className="h-50 w-auto mx-auto mb-6"
+              />
+            </div>
+
+            {/* Success Card */}
+            <Card className="backdrop-blur-md bg-card/80 border-border/50 shadow-xl">
             <CardHeader className="space-y-1 text-center">
               <div className="flex justify-center mb-4">
                 <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full">
@@ -131,6 +147,12 @@ function ResetPasswordForm() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Footer */}
+          <div className="text-center mt-8 text-sm text-muted-foreground">
+            <p>© 2025 Universidad UFPS - Programa de Ingeniería de Sistemas</p>
+          </div>
+          </div>
         </div>
       </div>
     )
@@ -138,22 +160,38 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center p-4">
-        {/* Background glassmorphism effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+      <div className="min-h-screen bg-white flex flex-col">
+        {/* Header section with logo and title stacked vertically */}
+        <div className="bg-red-600 text-white py-4 px-4 md:py-6">
+          <div className="max-w-6xl mx-auto flex flex-col items-center space-y-3">
+            {/* UFPS Logo centered at top */}
+            <img
+              src="/ufpslogo.png"
+              alt="UFPS Logo"
+              className="h-12 md:h-16 lg:h-20 w-auto"
+            />
 
-        <div className="w-full max-w-md relative">
-          {/* University Logo Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 backdrop-blur-sm rounded-full mb-4 border border-primary/20">
-              <GraduationCap className="w-8 h-8 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Sistema de Administración</h1>
-            <p className="text-muted-foreground">Chatbot Universitario - Ingeniería de Sistemas</p>
+            {/* Title below the logo */}
+            <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-extrabold text-center text-white tracking-wide drop-shadow-lg leading-tight">
+              Sistema de Información de Modalidades de Trabajos de Grado
+            </h1>
           </div>
+        </div>
 
-          {/* Error Card */}
-          <Card className="backdrop-blur-md bg-card/80 border-border/50 shadow-xl">
+        {/* Main content */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-md">
+            {/* University Logo Header */}
+            <div className="text-center mb-8">
+              <img
+                src="/logo_ingsistemas.png"
+                alt="Ingeniería de Sistemas Logo"
+                className="h-50 w-auto mx-auto mb-6"
+              />
+            </div>
+
+            {/* Error Card */}
+            <Card className="backdrop-blur-md bg-card/80 border-border/50 shadow-xl">
             <CardHeader className="space-y-1 text-center">
               <div className="flex justify-center mb-4">
                 <div className="inline-flex items-center justify-center w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full">
@@ -189,28 +227,50 @@ function ResetPasswordForm() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Footer */}
+          <div className="text-center mt-8 text-sm text-muted-foreground">
+            <p>© 2025 Universidad UFPS - Programa de Ingeniería de Sistemas</p>
+          </div>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted flex items-center justify-center p-4">
-      {/* Background glassmorphism effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Header section with logo and title stacked vertically */}
+      <div className="bg-red-600 text-white py-4 px-4 md:py-6">
+        <div className="max-w-6xl mx-auto flex flex-col items-center space-y-3">
+          {/* UFPS Logo centered at top */}
+          <img
+            src="/ufpslogo.png"
+            alt="UFPS Logo"
+            className="h-12 md:h-16 lg:h-20 w-auto"
+          />
 
-      <div className="w-full max-w-md relative">
-        {/* University Logo Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 backdrop-blur-sm rounded-full mb-4 border border-primary/20">
-            <GraduationCap className="w-8 h-8 text-primary" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Sistema de Administración</h1>
-          <p className="text-muted-foreground">Chatbot Universitario - Ingeniería de Sistemas</p>
+          {/* Title below the logo */}
+          <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-extrabold text-center text-white tracking-wide drop-shadow-lg leading-tight">
+            Sistema de Información de Modalidades de Trabajos de Grado
+          </h1>
         </div>
+      </div>
 
-        {/* Reset Password Card */}
-        <Card className="backdrop-blur-md bg-card/80 border-border/50 shadow-xl">
+      {/* Main content */}
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          {/* University Logo Header */}
+          <div className="text-center mb-8">
+            <img
+              src="/logo_ingsistemas.png"
+              alt="Ingeniería de Sistemas Logo"
+              className="h-50 w-auto mx-auto mb-6"
+            />
+          </div>
+
+          {/* Reset Password Card */}
+          <Card className="backdrop-blur-md bg-card/80 border-border/50 shadow-xl">
           <CardHeader className="space-y-1">
             <CardTitle className="text-xl text-center">Nueva Contraseña</CardTitle>
             <CardDescription className="text-center">
@@ -236,7 +296,7 @@ function ResetPasswordForm() {
                     placeholder="••••••••"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="pl-10 pr-10 bg-background/50 backdrop-blur-sm"
+                    className="pl-10 pr-10 bg-gray-100 border-gray-300"
                     required
                     disabled={isLoading}
                   />
@@ -291,7 +351,7 @@ function ResetPasswordForm() {
 
               <Button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="w-full bg-black hover:bg-gray-800 text-white"
                 disabled={isLoading || !newPassword.trim() || !confirmPassword.trim()}
               >
                 {isLoading ? (
@@ -322,7 +382,8 @@ function ResetPasswordForm() {
 
         {/* Footer */}
         <div className="text-center mt-8 text-sm text-muted-foreground">
-          <p>© 2024 Universidad - Ingeniería de Sistemas</p>
+          <p>© 2025 Universidad UFPS - Programa de Ingeniería de Sistemas</p>
+        </div>
         </div>
       </div>
     </div>
