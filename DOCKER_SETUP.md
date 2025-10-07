@@ -26,6 +26,11 @@ docker-compose up -d
 docker-compose down
 ```
 
+### Reconstruir servicios
+```bash
+docker-compose build --no-cache
+```
+
 ### Ver logs de un servicio específico
 ```bash
 docker-compose logs app
