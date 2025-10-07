@@ -223,7 +223,7 @@ class ModalityService {
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.detail || 'Error al eliminar modalidad')
+        throw new Error(errorData.detail || 'Error al eliminar modalidad, valida si hay preguntas o submodalidades asociadas.')
       }
     } catch (error) {
       if (error instanceof Error) {

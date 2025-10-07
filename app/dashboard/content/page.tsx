@@ -82,6 +82,12 @@ export default function ContentPage() {
   const [editingNewCategory, setEditingNewCategory] = useState<NewCategory | null>(null)
   const [isSubmittingNewCategory, setIsSubmittingNewCategory] = useState(false)
 
+  // Estados para confirmaciones de eliminación
+  const [isDeleteModalityOpen, setIsDeleteModalityOpen] = useState(false)
+  const [isDeleteSubmodalityOpen, setIsDeleteSubmodalityOpen] = useState(false)
+  const [isDeleteCategoryOpen, setIsDeleteCategoryOpen] = useState(false)
+  const [deletingItem, setDeletingItem] = useState<any>(null)
+
   // Hooks
   const { fetchData, loading: authLoading } = useAuthFetch()
   const { questions, loading: questionsLoading, refreshQuestions } = useQuestions()
@@ -138,67 +144,82 @@ export default function ContentPage() {
     if (!newModalityName.trim()) return
 
     setIsSubmittingModality(true)
-    try {
-      await createModality({
-        name: newModalityName,
-        description: newModalityDescription || undefined
-      })
+    const result = await createModality({
+      name: newModalityName,
+      description: newModalityDescription || undefined
+    })
 
+    if (result.success) {
       setNewModalityName("")
       setNewModalityDescription("")
       setIsCreateModalityOpen(false)
 
       console.log("Modalidad creada exitosamente")
-    } catch (error: any) {
-      if (error.message?.startsWith('Ya existe una modalidad')) {
+    } else {
+      if (result.error?.startsWith('Ya existe una modalidad')) {
         setErrorMessage('Ya existe una modalidad con ese nombre')
         setShowErrorDialog(true)
       } else {
-        console.error("Error al crear modalidad:", error)
-        setErrorMessage(error.message || 'Error al crear la modalidad')
+        setErrorMessage(result.error || 'Error al crear la modalidad')
         setShowErrorDialog(true)
       }
-    } finally {
-      setIsSubmittingModality(false)
     }
+
+    setIsSubmittingModality(false)
   }
 
   const handleEditModality = async () => {
     if (!editingModality || !newModalityName.trim()) return
 
     setIsSubmittingModality(true)
-    try {
-      await updateModality(editingModality.id, {
-        name: newModalityName,
-        description: newModalityDescription || undefined
-      })
+    const result = await updateModality(editingModality.id, {
+      name: newModalityName,
+      description: newModalityDescription || undefined
+    })
 
+    if (result.success) {
       setNewModalityName("")
       setNewModalityDescription("")
       setEditingModality(null)
       setIsEditModalityOpen(false)
 
       console.log("Modalidad actualizada exitosamente")
-    } catch (error: any) {
-      if (error.message?.startsWith('Ya existe una modalidad')) {
+    } else {
+      if (result.error?.startsWith('Ya existe una modalidad')) {
         setErrorMessage('Ya existe una modalidad con ese nombre')
         setShowErrorDialog(true)
       } else {
-        console.error("Error al actualizar modalidad:", error)
-        setErrorMessage(error.message || 'Error al actualizar la modalidad')
+        setErrorMessage(result.error || 'Error al actualizar la modalidad')
         setShowErrorDialog(true)
       }
-    } finally {
-      setIsSubmittingModality(false)
     }
+
+    setIsSubmittingModality(false)
   }
 
-  const handleDeleteModality = async (modalityId: string) => {
-    try {
-      await deleteModality(modalityId)
+  const handleDeleteModality = (modality: Modality) => {
+    setDeletingItem(modality)
+    setIsDeleteModalityOpen(true)
+  }
+
+  const confirmDeleteModality = async () => {
+    if (!deletingItem) return
+
+    const result = await deleteModality(deletingItem.id)
+    if (result.success) {
       console.log("Modalidad eliminada exitosamente")
-    } catch (error) {
-      console.error("Error al eliminar modalidad:", error)
+      setIsDeleteModalityOpen(false)
+      setDeletingItem(null)
+    } else {
+      // Show specific error message for active relations
+      if (result.error?.includes('relaciones') || result.error?.includes('asociadas') || result.error?.includes('foreign key')) {
+        setErrorMessage(`No se puede eliminar la modalidad "${deletingItem.name}" porque tiene preguntas o submodalidades asociadas.`)
+      } else {
+        setErrorMessage(result.error || 'Error al eliminar la modalidad')
+      }
+      setShowErrorDialog(true)
+      setIsDeleteModalityOpen(false)
+      setDeletingItem(null)
     }
   }
 
@@ -214,44 +235,43 @@ export default function ContentPage() {
     if (!newSubmodalityName.trim() || !newSubmodalityModalityId) return
 
     setIsSubmittingSubmodality(true)
-    try {
-      await createSubmodality({
-        name: newSubmodalityName,
-        description: newSubmodalityDescription || undefined,
-        modality_id: newSubmodalityModalityId
-      })
+    const result = await createSubmodality({
+      name: newSubmodalityName,
+      description: newSubmodalityDescription || undefined,
+      modality_id: newSubmodalityModalityId
+    })
 
+    if (result.success) {
       setNewSubmodalityName("")
       setNewSubmodalityDescription("")
       setNewSubmodalityModalityId("")
       setIsCreateSubmodalityOpen(false)
 
       console.log("Submodalidad creada exitosamente")
-    } catch (error: any) {
-      if (error.message?.startsWith('Ya existe una submodalidad')) {
+    } else {
+      if (result.error?.startsWith('Ya existe una submodalidad')) {
         setErrorMessage('Ya existe una submodalidad con ese nombre')
         setShowErrorDialog(true)
       } else {
-        console.error("Error al crear submodalidad:", error)
-        setErrorMessage(error.message || 'Error al crear la submodalidad')
+        setErrorMessage(result.error || 'Error al crear la submodalidad')
         setShowErrorDialog(true)
       }
-    } finally {
-      setIsSubmittingSubmodality(false)
     }
+
+    setIsSubmittingSubmodality(false)
   }
 
   const handleEditSubmodality = async () => {
     if (!editingSubmodality || !newSubmodalityName.trim()) return
 
     setIsSubmittingSubmodality(true)
-    try {
-      await updateSubmodality(editingSubmodality.id, {
-        name: newSubmodalityName,
-        description: newSubmodalityDescription || undefined,
-        modality_id: newSubmodalityModalityId || editingSubmodality.modality_id
-      })
+    const result = await updateSubmodality(editingSubmodality.id, {
+      name: newSubmodalityName,
+      description: newSubmodalityDescription || undefined,
+      modality_id: newSubmodalityModalityId || editingSubmodality.modality_id
+    })
 
+    if (result.success) {
       setNewSubmodalityName("")
       setNewSubmodalityDescription("")
       setNewSubmodalityModalityId("")
@@ -259,26 +279,48 @@ export default function ContentPage() {
       setIsEditSubmodalityOpen(false)
 
       console.log("Submodalidad actualizada exitosamente")
-    } catch (error: any) {
-      if (error.message?.startsWith('Ya existe una submodalidad')) {
+    } else {
+      if (result.error?.startsWith('Ya existe una submodalidad')) {
         setErrorMessage('Ya existe una submodalidad con ese nombre')
         setShowErrorDialog(true)
       } else {
-        console.error("Error al actualizar submodalidad:", error)
-        setErrorMessage(error.message || 'Error al actualizar la submodalidad')
+        setErrorMessage(result.error || 'Error al actualizar la submodalidad')
         setShowErrorDialog(true)
       }
-    } finally {
-      setIsSubmittingSubmodality(false)
     }
+
+    setIsSubmittingSubmodality(false)
   }
 
-  const handleDeleteSubmodality = async (submodalityId: string) => {
+  const handleDeleteSubmodality = (submodality: Submodality) => {
+    setDeletingItem(submodality)
+    setIsDeleteSubmodalityOpen(true)
+  }
+
+  const confirmDeleteSubmodality = async () => {
+    if (!deletingItem) return
+
     try {
-      await deleteSubmodality(submodalityId)
-      console.log("Submodalidad eliminada exitosamente")
-    } catch (error) {
+      const result = await deleteSubmodality(deletingItem.id)
+      if (result.success) {
+        console.log("Submodalidad eliminada exitosamente")
+        setIsDeleteSubmodalityOpen(false)
+        setDeletingItem(null)
+      } else {
+        // Show specific error message for active relations
+        setErrorMessage(`No se puede eliminar la submodalidad "${deletingItem.name}" porque tiene preguntas o categorías asociadas.`)
+        setShowErrorDialog(true)
+        setIsDeleteSubmodalityOpen(false)
+        setDeletingItem(null)
+      }
+    } catch (error: any) {
       console.error("Error al eliminar submodalidad:", error)
+      // Assume it's due to relations if delete fails
+      const errorMessage = `No se puede eliminar la submodalidad "${deletingItem.name}" debido a que tiene relaciones con preguntas o categorías.`
+      setErrorMessage(errorMessage)
+      setShowErrorDialog(true)
+      setIsDeleteSubmodalityOpen(false)
+      setDeletingItem(null)
     }
   }
 
@@ -295,44 +337,43 @@ export default function ContentPage() {
     if (!newCategoryHierName.trim() || !newCategorySubmodalityId) return
 
     setIsSubmittingNewCategory(true)
-    try {
-      await createNewCategory({
-        name: newCategoryHierName,
-        description: newCategoryHierDescription || undefined,
-        submodality_id: newCategorySubmodalityId
-      })
+    const result = await createNewCategory({
+      name: newCategoryHierName,
+      description: newCategoryHierDescription || undefined,
+      submodality_id: newCategorySubmodalityId
+    })
 
+    if (result.success) {
       setNewCategoryHierName("")
       setNewCategoryHierDescription("")
       setNewCategorySubmodalityId("")
       setIsCreateNewCategoryOpen(false)
 
       console.log("Categoría creada exitosamente")
-    } catch (error: any) {
-      if (error.message?.startsWith('Ya existe una categoría')) {
+    } else {
+      if (result.error?.startsWith('Ya existe una categoría')) {
         setErrorMessage('Ya existe una categoría con ese nombre')
         setShowErrorDialog(true)
       } else {
-        console.error("Error al crear categoría:", error)
-        setErrorMessage(error.message || 'Error al crear la categoría')
+        setErrorMessage(result.error || 'Error al crear la categoría')
         setShowErrorDialog(true)
       }
-    } finally {
-      setIsSubmittingNewCategory(false)
     }
+
+    setIsSubmittingNewCategory(false)
   }
 
   const handleEditNewCategory = async () => {
     if (!editingNewCategory || !newCategoryHierName.trim()) return
 
     setIsSubmittingNewCategory(true)
-    try {
-      await updateNewCategory(editingNewCategory.id, {
-        name: newCategoryHierName,
-        description: newCategoryHierDescription || undefined,
-        submodality_id: newCategorySubmodalityId || editingNewCategory.submodality_id
-      })
+    const result = await updateNewCategory(editingNewCategory.id, {
+      name: newCategoryHierName,
+      description: newCategoryHierDescription || undefined,
+      submodality_id: newCategorySubmodalityId || editingNewCategory.submodality_id
+    })
 
+    if (result.success) {
       setNewCategoryHierName("")
       setNewCategoryHierDescription("")
       setNewCategorySubmodalityId("")
@@ -340,26 +381,48 @@ export default function ContentPage() {
       setIsEditNewCategoryOpen(false)
 
       console.log("Categoría actualizada exitosamente")
-    } catch (error: any) {
-      if (error.message?.startsWith('Ya existe una categoría')) {
+    } else {
+      if (result.error?.startsWith('Ya existe una categoría')) {
         setErrorMessage('Ya existe una categoría con ese nombre')
         setShowErrorDialog(true)
       } else {
-        console.error("Error al actualizar categoría:", error)
-        setErrorMessage(error.message || 'Error al actualizar la categoría')
+        setErrorMessage(result.error || 'Error al actualizar la categoría')
         setShowErrorDialog(true)
       }
-    } finally {
-      setIsSubmittingNewCategory(false)
     }
+
+    setIsSubmittingNewCategory(false)
   }
 
-  const handleDeleteNewCategory = async (categoryId: string) => {
+  const handleDeleteNewCategory = (category: NewCategory) => {
+    setDeletingItem(category)
+    setIsDeleteCategoryOpen(true)
+  }
+
+  const confirmDeleteCategory = async () => {
+    if (!deletingItem) return
+
     try {
-      await deleteNewCategory(categoryId)
-      console.log("Categoría eliminada exitosamente")
-    } catch (error) {
+      const result = await deleteNewCategory(deletingItem.id)
+      if (result.success) {
+        console.log("Categoría eliminada exitosamente")
+        setIsDeleteCategoryOpen(false)
+        setDeletingItem(null)
+      } else {
+        // Show specific error message for active relations
+        setErrorMessage(`No se puede eliminar la categoría "${deletingItem.name}" porque tiene preguntas asociadas.`)
+        setShowErrorDialog(true)
+        setIsDeleteCategoryOpen(false)
+        setDeletingItem(null)
+      }
+    } catch (error: any) {
       console.error("Error al eliminar categoría:", error)
+      // Assume it's due to relations if delete fails
+      const errorMessage = `No se puede eliminar la categoría "${deletingItem.name}" debido a que tiene relaciones con preguntas.`
+      setErrorMessage(errorMessage)
+      setShowErrorDialog(true)
+      setIsDeleteCategoryOpen(false)
+      setDeletingItem(null)
     }
   }
 
@@ -476,8 +539,62 @@ export default function ContentPage() {
 
         console.log("Pregunta generada exitosamente:", response)
       }
-    } catch (error) {
-      console.error("Error al generar respuesta:", error)
+    } catch (error: any) {
+      // console.error("Error al generar respuesta:", error)
+      // Handle different error types and status codes
+      let errorMessage = "Error desconocido al generar la pregunta"
+
+      if (error?.status) {
+        switch (error.status) {
+          case 400:
+            errorMessage = "Datos inválidos. Verifica que todos los campos estén completos y correctos."
+            break
+          case 401:
+            errorMessage = "Sesión expirada. Por favor, inicia sesión nuevamente."
+            break
+          case 403:
+            errorMessage = "No tienes permisos para realizar esta acción."
+            break
+          case 404:
+            errorMessage = "Recurso no encontrado. Verifica la configuración del servidor."
+            break
+          case 413:
+            errorMessage = "El archivo PDF es demasiado grande. Intenta con un archivo más pequeño."
+            break
+          case 422:
+            errorMessage = "Datos de entrada inválidos. Revisa la información proporcionada."
+            break
+          case 429:
+            errorMessage = "Demasiadas solicitudes. Espera un momento antes de intentar nuevamente."
+            break
+          case 500:
+            errorMessage = "Error al crear la pregunta. Inténtalo más tarde."
+            break
+          case 502:
+          case 503:
+          case 504:
+            errorMessage = "Servicio temporalmente no disponible. Inténtalo más tarde."
+            break
+          default:
+            if (error.status >= 500) {
+              errorMessage = "Error del servidor. Inténtalo más tarde."
+            } else if (error.status >= 400) {
+              errorMessage = "Error en la solicitud. Verifica los datos e intenta nuevamente."
+            }
+        }
+      } else if (error?.message) {
+        // Network errors or other errors with messages
+        if (error.message.includes('fetch')) {
+          errorMessage = "Error de conexión. Verifica tu conexión a internet e intenta nuevamente."
+        } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+          errorMessage = "La solicitud tardó demasiado. Inténtalo nuevamente."
+        } else {
+          errorMessage = error.message
+        }
+      }
+
+      setErrorMessage(errorMessage)
+      setShowErrorDialog(true)
     } finally {
       setIsGenerating(false)
     }
@@ -510,8 +627,45 @@ export default function ContentPage() {
 
       // Show success dialog
       setShowSuccessDialog(true)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al actualizar respuesta:", error)
+
+      let errorMessage = "Error al guardar la respuesta"
+
+      if (error?.status) {
+        switch (error.status) {
+          case 400:
+            errorMessage = "Datos inválidos. La respuesta no puede estar vacía."
+            break
+          case 401:
+            errorMessage = "Sesión expirada. Por favor, inicia sesión nuevamente."
+            break
+          case 403:
+            errorMessage = "No tienes permisos para modificar esta respuesta."
+            break
+          case 404:
+            errorMessage = "Pregunta no encontrada. Puede que haya sido eliminada."
+            break
+          case 500:
+            errorMessage = "Error interno del servidor. Inténtalo más tarde."
+            break
+          default:
+            if (error.status >= 500) {
+              errorMessage = "Error del servidor. Inténtalo más tarde."
+            } else if (error.status >= 400) {
+              errorMessage = "Error al guardar. Verifica los datos e intenta nuevamente."
+            }
+        }
+      } else if (error?.message) {
+        if (error.message.includes('fetch')) {
+          errorMessage = "Error de conexión. Verifica tu conexión a internet."
+        } else {
+          errorMessage = error.message
+        }
+      }
+
+      setErrorMessage(errorMessage)
+      setShowErrorDialog(true)
     }
   }
 
@@ -927,7 +1081,21 @@ export default function ContentPage() {
                         </Button>
                         <Button
                           variant="outline"
-                          onClick={() => setShowPreview(false)}
+                          onClick={async () => {
+                            if (currentQuestionId) {
+                              try {
+                                await fetchData(buildApiUrl(`${API_CONFIG.ENDPOINTS.QUESTIONS_NO_SLASH}/${currentQuestionId}`), {
+                                  method: 'DELETE'
+                                })
+                              } catch (error) {
+                                console.error("Error al eliminar la pregunta:", error)
+                              }
+                            }
+                            setShowPreview(false)
+                            setCurrentQuestionId(null)
+                            setGeneratedResponse("")
+                            setEditableModelResponse("")
+                          }}
                           className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
                         >
                           Cancelar
@@ -1072,7 +1240,7 @@ export default function ContentPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteModality(modality.id)}
+                            onClick={() => handleDeleteModality(modality)}
                             className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                             title="Eliminar modalidad"
                           >
@@ -1150,7 +1318,7 @@ export default function ContentPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteSubmodality(submodality.id)}
+                            onClick={() => handleDeleteSubmodality(submodality)}
                             className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                             title="Eliminar submodalidad"
                           >
@@ -1229,7 +1397,7 @@ export default function ContentPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteNewCategory(category.id)}
+                            onClick={() => handleDeleteNewCategory(category)}
                             className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
                             title="Eliminar categoría"
                           >
@@ -1653,6 +1821,75 @@ export default function ContentPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Modality Confirmation Dialog */}
+        <AlertDialog open={isDeleteModalityOpen} onOpenChange={setIsDeleteModalityOpen}>
+          <AlertDialogContent className="bg-white border-red-200">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-black">¿Eliminar Modalidad?</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-600">
+                ¿Estás seguro de que deseas eliminar la modalidad <strong>"{deletingItem?.name}"</strong>?.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-red-300 text-black hover:bg-red-50">
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={confirmDeleteModality}
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Submodality Confirmation Dialog */}
+        <AlertDialog open={isDeleteSubmodalityOpen} onOpenChange={setIsDeleteSubmodalityOpen}>
+          <AlertDialogContent className="bg-white border-red-200">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-black">¿Eliminar Submodalidad?</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-600">
+                ¿Estás seguro de que deseas eliminar la submodalidad <strong>"{deletingItem?.name}"</strong>?.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-red-300 text-black hover:bg-red-50">
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={confirmDeleteSubmodality}
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Category Confirmation Dialog */}
+        <AlertDialog open={isDeleteCategoryOpen} onOpenChange={setIsDeleteCategoryOpen}>
+          <AlertDialogContent className="bg-white border-red-200">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-black">¿Eliminar Categoría?</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-600">
+                ¿Estás seguro de que deseas eliminar la categoría <strong>"{deletingItem?.name}"</strong>?.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="border-red-300 text-black hover:bg-red-50">
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={confirmDeleteCategory}
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Success Dialog */}
         <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
