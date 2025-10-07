@@ -31,11 +31,11 @@ export function useModalities() {
       setError(null)
       const newModality = await modalityService.createModality(modalityData)
       setModalities(prev => [...prev, newModality])
-      return newModality
+      return { success: true, data: newModality }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al crear modalidad'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 
@@ -43,14 +43,14 @@ export function useModalities() {
     try {
       setError(null)
       const updatedModality = await modalityService.updateModality(modalityId, modalityData)
-      setModalities(prev => prev.map(modality => 
+      setModalities(prev => prev.map(modality =>
         modality.id === modalityId ? updatedModality : modality
       ))
-      return updatedModality
+      return { success: true, data: updatedModality }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al actualizar modalidad'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 
@@ -59,10 +59,11 @@ export function useModalities() {
       setError(null)
       await modalityService.deleteModality(modalityId)
       setModalities(prev => prev.filter(modality => modality.id !== modalityId))
+      return { success: true }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error al eliminar modalidad'
+      const errorMessage = err instanceof Error ? err.message : 'Error al eliminar modalidad, valida si hay preguntas o submodalidades asociadas.'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 

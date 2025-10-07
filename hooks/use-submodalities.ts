@@ -30,11 +30,11 @@ export function useSubmodalities() {
       setError(null)
       const newSubmodality = await submodalityService.createSubmodality(submodalityData)
       setSubmodalities(prev => [...prev, newSubmodality])
-      return newSubmodality
+      return { success: true, data: newSubmodality }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al crear submodalidad'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 
@@ -42,14 +42,14 @@ export function useSubmodalities() {
     try {
       setError(null)
       const updatedSubmodality = await submodalityService.updateSubmodality(submodalityId, submodalityData)
-      setSubmodalities(prev => prev.map(submodality => 
+      setSubmodalities(prev => prev.map(submodality =>
         submodality.id === submodalityId ? updatedSubmodality : submodality
       ))
-      return updatedSubmodality
+      return { success: true, data: updatedSubmodality }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al actualizar submodalidad'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 
@@ -58,10 +58,11 @@ export function useSubmodalities() {
       setError(null)
       await submodalityService.deleteSubmodality(submodalityId)
       setSubmodalities(prev => prev.filter(submodality => submodality.id !== submodalityId))
+      return { success: true }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al eliminar submodalidad'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 

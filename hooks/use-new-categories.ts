@@ -30,11 +30,11 @@ export function useNewCategories() {
       setError(null)
       const newCategory = await newCategoryService.createNewCategory(categoryData)
       setNewCategories(prev => [...prev, newCategory])
-      return newCategory
+      return { success: true, data: newCategory }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al crear categoría'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 
@@ -42,14 +42,14 @@ export function useNewCategories() {
     try {
       setError(null)
       const updatedCategory = await newCategoryService.updateNewCategory(categoryId, categoryData)
-      setNewCategories(prev => prev.map(category => 
+      setNewCategories(prev => prev.map(category =>
         category.id === categoryId ? updatedCategory : category
       ))
-      return updatedCategory
+      return { success: true, data: updatedCategory }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al actualizar categoría'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 
@@ -58,10 +58,11 @@ export function useNewCategories() {
       setError(null)
       await newCategoryService.deleteNewCategory(categoryId)
       setNewCategories(prev => prev.filter(category => category.id !== categoryId))
+      return { success: true }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al eliminar categoría'
       setError(errorMessage)
-      throw err
+      return { success: false, error: errorMessage }
     }
   }, [])
 

@@ -13,6 +13,9 @@ export interface Question {
   context_file?: string | null
   category_id: string
   category_name: string
+  full_name?: string // Full hierarchical path of the category
+  modality_id?: string
+  submodality_id?: string
   created_at: string
 }
 
@@ -46,6 +49,8 @@ export interface UpdateQuestionRequest {
   context_text?: string
   context_type?: "text" | "pdf"
   category_id?: string
+  modality_id?: string
+  submodality_id?: string
 }
 
 class QuestionService {
