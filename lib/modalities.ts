@@ -71,7 +71,7 @@ class ModalityService {
   async getModalities(): Promise<Modality[]> {
     try {
       const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/modalities`
+        `${API_CONFIG.BASE_URL}/chat/modalities/`
       )
 
       if (!response.ok) {
@@ -95,7 +95,7 @@ class ModalityService {
   async getModality(modalityId: string): Promise<ModalityWithSubmodalities> {
     try {
       const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/modalities/${modalityId}/`
+        `${API_CONFIG.BASE_URL}/chat/modalities/${modalityId}`
       )
 
       if (!response.ok) {
@@ -167,7 +167,7 @@ class ModalityService {
   async updateModality(modalityId: string, modalityData: UpdateModalityRequest): Promise<Modality> {
     try {
       const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/modalities/${modalityId}/`,
+        `${API_CONFIG.BASE_URL}/chat/modalities/${modalityId}`,
         {
           method: 'PUT', // Cambiar de PATCH a PUT según tu API
           headers: {
@@ -215,7 +215,7 @@ class ModalityService {
   async deleteModality(modalityId: string): Promise<void> {
     try {
       const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/modalities/${modalityId}/`,
+        `${API_CONFIG.BASE_URL}/chat/modalities/${modalityId}`,
         {
           method: 'DELETE',
         }

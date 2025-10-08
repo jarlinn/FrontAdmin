@@ -519,7 +519,7 @@ export default function ContentPage() {
         setGenerationProgress(prev => Math.min(prev + 10, 90))
       }, 500)
 
-      const response = await fetchData(buildApiUrl(API_CONFIG.ENDPOINTS.QUESTIONS), {
+      const response = await fetchData(buildApiUrl(API_CONFIG.ENDPOINTS.QUESTIONS_NO_SLASH), {
         method: 'POST',
         body: formData
       })

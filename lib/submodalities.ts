@@ -118,7 +118,7 @@ class SubmodalityService {
   async updateSubmodality(submodalityId: string, submodalityData: UpdateSubmodalityRequest): Promise<Submodality> {
     try {
       const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/submodalities/${submodalityId}/`,
+        `${API_CONFIG.BASE_URL}/chat/submodalities/${submodalityId}`,
         {
           method: 'PUT',
           headers: {
@@ -166,7 +166,7 @@ class SubmodalityService {
   async deleteSubmodality(submodalityId: string): Promise<void> {
     try {
       const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/submodalities/${submodalityId}/`,
+        `${API_CONFIG.BASE_URL}/chat/submodalities/${submodalityId}`,
         {
           method: 'DELETE',
         }

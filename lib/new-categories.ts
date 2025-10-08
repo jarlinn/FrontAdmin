@@ -133,7 +133,7 @@ class NewCategoryService {
   async updateNewCategory(categoryId: string, categoryData: UpdateNewCategoryRequest): Promise<NewCategory> {
     try {
       const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/categories/${categoryId}/`,
+        `${API_CONFIG.BASE_URL}/chat/categories/${categoryId}`,
         {
           method: 'PUT',
           headers: {
@@ -181,7 +181,7 @@ class NewCategoryService {
   async deleteNewCategory(categoryId: string): Promise<void> {
     try {
       const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/categories/${categoryId}/`,
+        `${API_CONFIG.BASE_URL}/chat/categories/${categoryId}`,
         {
           method: 'DELETE',
         }
