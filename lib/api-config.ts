@@ -1,7 +1,23 @@
 // Configuración de la API del chatbot
+const getBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL
+
+  if (envUrl) {
+    // Forzar HTTPS si la URL comienza con http://
+    const forcedHttpsUrl = envUrl.startsWith('http://') ? envUrl.replace('http://', 'https://') : envUrl
+    console.log('API BASE_URL (forced HTTPS):', forcedHttpsUrl)
+    return forcedHttpsUrl
+  }
+
+  // Fallback para desarrollo local
+  const fallbackUrl = 'http://0.0.0.0:8000'
+  console.log('API BASE_URL (fallback):', fallbackUrl)
+  return fallbackUrl
+}
+
 export const API_CONFIG = {
   // URL base de la API
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://0.0.0.0:8000',
+  BASE_URL: getBaseUrl(),
   
   // Endpoints
   ENDPOINTS: {
