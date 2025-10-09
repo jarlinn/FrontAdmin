@@ -52,6 +52,7 @@ export default function SettingsPage() {
   })
   const [profileSuccess, setProfileSuccess] = useState(false)
   const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   // Estados para cambio de email
   const [emailChangeForm, setEmailChangeForm] = useState({
@@ -151,6 +152,7 @@ export default function SettingsPage() {
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
     setPasswordSuccess(false)
+    setPasswordError(null)
 
     // Validar que las contraseñas coincidan
     if (passwordForm.new_password !== passwordForm.confirm_password) {
@@ -174,9 +176,13 @@ export default function SettingsPage() {
 
       // Limpiar mensaje de éxito después de 3 segundos
       setTimeout(() => setPasswordSuccess(false), 3000)
-    } catch (error) {
-      console.error('Error updating password:', error)
+    } catch (error: any) {
       setPasswordSuccess(false)
+
+      // Manejar error de contraseña incorrecta
+      if (error?.status === 400) {
+        setPasswordError('La contraseña actual es incorrecta. Verifícala e intenta nuevamente.')
+      }
     }
   }
 
@@ -209,7 +215,16 @@ export default function SettingsPage() {
         setEmailChangeTokenExpires(expiresAt)
         setShowEmailChangeDialog(true)
       } else {
-        setEmailChangeError(data.detail || data.message || 'Error al solicitar cambio de email')
+        // Manejar errores específicos por código de estado
+        if (response.status === 400) {
+          setEmailChangeError('Este correo electrónico ya está registrado en el sistema. Por favor, utiliza otro correo.')
+        } else if (response.status === 422) {
+          setEmailChangeError('El correo electrónico tiene un formato incorrecto. Verifica que sea una dirección de email válida.')
+        } else if (response.status === 500) {
+          setEmailChangeError('Error al intentar cambiar el correo electrónico. Inténtalo más tarde.')
+        } else {
+          setEmailChangeError(data.detail || data.message || 'Error al solicitar cambio de email')
+        }
       }
     } catch (error) {
       console.error('Error requesting email change:', error)
@@ -408,10 +423,10 @@ export default function SettingsPage() {
                   </Alert>
                 )}
 
-                {updatePasswordError && (
+                {passwordError && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{updatePasswordError}</AlertDescription>
+                    <AlertDescription>{passwordError}</AlertDescription>
                   </Alert>
                 )}
 
@@ -534,6 +549,13 @@ export default function SettingsPage() {
               </Alert>
             )}
 
+            {emailChangeError && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{emailChangeError}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="newEmail">Nuevo Correo Electrónico</Label>
@@ -623,7 +645,7 @@ export default function SettingsPage() {
                 1. Ingresa el código enviado a tu email actual<br />
                 2. Después de verificar, recibirás un email en tu nueva dirección<br />
                 3. Haz clic en el enlace del email para completar el cambio<br />
-                <em>Mantendrás la misma contraseña.</em>
+                4. Luego de confirmar el cambio, te llegara una nueva contraseña para el ingreso<br />
               </AlertDescription>
             </Alert>
           </div>

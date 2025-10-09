@@ -1,5 +1,7 @@
 "use client"
 
+import { useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +20,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import AdminLayout from "@/components/admin-layout"
+import { API_CONFIG } from "@/lib/api-config"
+import { authService } from "@/lib/auth"
 
 const stats = [
   {
@@ -103,6 +107,40 @@ const quickActions = [
 ]
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = searchParams.get('token')
+
+    if (token) {
+      // Si hay un token, es una solicitud de completación de cambio de email
+      const completeEmailChange = async () => {
+        try {
+          const response = await fetch(`${API_CONFIG.BASE_URL}/auth/email-change-complete?token=${encodeURIComponent(token)}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (response.ok) {
+            // Éxito - redirigir a la página de completación con mensaje de éxito
+            router.push('/auth/email-change-complete?status=success&message=¡Cambio de correo electrónico completado exitosamente! Ahora puedes cerrar sesión y acceder con tu nuevo correo electrónico.')
+          } else {
+            // Error - redirigir a la página de completación con mensaje de error
+            router.push('/auth/email-change-complete?status=error')
+          }
+        } catch (error) {
+          console.error('Error completing email change:', error)
+          router.push('/email-change-complete?status=error')
+        }
+      }
+
+      completeEmailChange()
+    }
+  }, [searchParams, router])
+
   return (
     <AdminLayout>
       <div className="space-y-8">

@@ -5,7 +5,8 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value
   const isLoginPage = request.nextUrl.pathname === '/login'
   const isPasswordRecoveryRoute = request.nextUrl.pathname === '/forgot-password' || request.nextUrl.pathname === '/reset-password'
-  const isPublicRoute = isLoginPage || isPasswordRecoveryRoute || request.nextUrl.pathname === '/'
+  const isEmailChangeComplete = request.nextUrl.pathname === '/auth/email-change-complete'
+  const isPublicRoute = isLoginPage || isPasswordRecoveryRoute || request.nextUrl.pathname === '/' || isEmailChangeComplete
 
   // Si no hay token y no está en una ruta pública, redirigir al login
   if (!token && !isPublicRoute) {

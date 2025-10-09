@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils"
 import { useCallback } from "react"
 import { authService } from "@/lib/auth"
 import { useAuthState } from "@/hooks/use-auth-state"
+import { API_CONFIG } from "@/lib/api-config"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -35,8 +36,17 @@ interface AdminLayoutProps {
   children: React.ReactNode
 }
 
+interface UserProfile {
+  id: string
+  name: string | null
+  email: string
+  role: string
+  is_active: boolean
+}
+
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const pathname = usePathname()
   const router = useRouter()
   const { isAuthenticated, isLoading } = useAuthState()
@@ -47,6 +57,24 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       router.push("/login")
     }
   }, [isAuthenticated, isLoading, router])
+
+  // Cargar perfil del usuario
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      const loadUserProfile = async () => {
+        try {
+          const response = await authService.authenticatedFetch(`${API_CONFIG.BASE_URL}/profile/me`)
+          if (response.ok) {
+            const profile = await response.json()
+            setUserProfile(profile)
+          }
+        } catch (error) {
+          console.error('Error loading user profile:', error)
+        }
+      }
+      loadUserProfile()
+    }
+  }, [isAuthenticated, isLoading])
 
   const handleLogout = useCallback(() => {
     authService.logout()
@@ -135,8 +163,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <User className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">Admin Usuario</p>
-                <p className="text-xs text-gray-600 truncate">admin@universidad.edu</p>
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {userProfile?.name || 'Usuario'}
+                </p>
+                <p className="text-xs text-gray-600 truncate">
+                  {userProfile?.email || 'usuario@email.com'}
+                </p>
               </div>
             </div>
             <Button

@@ -642,13 +642,13 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
             <CardContent className="p-0">
               {/* Encabezados de la tabla - Responsivo */}
               <div className="hidden md:grid grid-cols-12 gap-3 lg:gap-4 p-4 border-b border-gray-200 bg-gray-50">
-                <div className="col-span-6 lg:col-span-6 xl:col-span-7 text-sm font-medium text-muted-foreground">
+                <div className="col-span-6 lg:col-span-6 xl:col-span-6 text-sm font-medium text-muted-foreground">
                   Pregunta / Respuesta Generada
                 </div>
                 <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground">
                   Estado
                 </div>
-                <div className="col-span-2 lg:col-span-2 xl:col-span-1 text-sm font-medium text-muted-foreground">
+                <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground">
                   Modalidad / Doc
                 </div>
                 <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground text-right">
@@ -666,7 +666,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                     <CardContent className="p-4">
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 lg:gap-4">
                     {/* Columna: Pregunta / Respuesta */}
-                    <div className="md:col-span-6 lg:col-span-6 xl:col-span-7 space-y-2">
+                    <div className="md:col-span-6 lg:col-span-6 xl:col-span-6 space-y-2">
                       <div>
                         <h3 className="font-semibold text-sm leading-tight mb-1">
                           {question.question_text}
@@ -773,12 +773,12 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                     </div>
 
                     {/* Columna: Categoría (con Doc abajo) */}
-                    <div className="hidden md:flex md:col-span-2 lg:col-span-2 xl:col-span-1 flex-col justify-start space-y-1">
-                      <Badge variant="outline" className="text-xs w-fit">
+                    <div className="hidden md:flex md:col-span-2 lg:col-span-2 xl:col-span-2 flex-col justify-start space-y-1">
+                      <Badge variant="outline" className="text-xs w-full text-left whitespace-normal break-words" title={getCategoryFullPath(question)}>
                         {getCategoryFullPath(question)}
                       </Badge>
-                      <Badge 
-                        variant={question.context_type === "pdf" ? "default" : "secondary"} 
+                      <Badge
+                        variant={question.context_type === "pdf" ? "default" : "secondary"}
                         className="text-xs w-fit"
                       >
                         {question.context_type === "pdf" ? "PDF" : "Texto"}
