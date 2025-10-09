@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,7 +10,7 @@ import Link from "next/link"
 import { API_CONFIG } from "@/lib/api-config"
 import { authService } from "@/lib/auth"
 
-export default function EmailChangeCompletePage() {
+function EmailChangeCompleteContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
   const [message, setMessage] = useState('')
   const searchParams = useSearchParams()
@@ -120,32 +120,42 @@ export default function EmailChangeCompletePage() {
 
           <div className="flex flex-col space-y-2">
             {status === 'success' && (
-              <Button asChild className="w-full bg-red-600 hover:bg-red-700">
-                <Link href="/dashboard">
-                  Ir al Dashboard
-                </Link>
+              <Button
+                onClick={() => router.push('/login')}
+                className="w-full bg-red-600 hover:bg-red-700"
+              >
+                Ir al Login
               </Button>
             )}
 
             {status === 'error' && (
               <Button
-                onClick={() => router.push('/dashboard/settings')}
+                onClick={() => router.push('/login')}
                 className="w-full bg-red-600 hover:bg-red-700"
               >
-                Volver a Configuración
+                Ir al Login
               </Button>
             )}
-
-            <Button
-              variant="outline"
-              onClick={() => router.push('/login')}
-              className="w-full"
-            >
-              Ir al Login
-            </Button>
           </div>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function EmailChangeCompletePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-red-600 mb-4" />
+            <p className="text-muted-foreground">Cargando...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <EmailChangeCompleteContent />
+    </Suspense>
   )
 }

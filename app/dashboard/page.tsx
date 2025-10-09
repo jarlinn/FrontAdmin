@@ -22,6 +22,7 @@ import Link from "next/link"
 import AdminLayout from "@/components/admin-layout"
 import { API_CONFIG } from "@/lib/api-config"
 import { authService } from "@/lib/auth"
+import { Suspense } from "react"
 
 const stats = [
   {
@@ -106,7 +107,7 @@ const quickActions = [
   // }
 ]
 
-export default function DashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -133,7 +134,7 @@ export default function DashboardPage() {
           }
         } catch (error) {
           console.error('Error completing email change:', error)
-          router.push('/email-change-complete?status=error')
+          router.push('/auth/email-change-complete?status=error')
         }
       }
 
@@ -241,5 +242,20 @@ export default function DashboardPage() {
 
       </div>
     </AdminLayout>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando dashboard...</p>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   )
 }
