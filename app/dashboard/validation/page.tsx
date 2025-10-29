@@ -178,16 +178,6 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
 
   // Función para obtener el full_path de una categoría por ID
   const getCategoryFullPath = (question: Question): string => {
-    // Debug: Log what we're receiving
-    console.log('🔍 Question data for display:', {
-      question_id: question.question_id,
-      full_name: question.full_name,
-      category_name: question.category_name,
-      modality_id: question.modality_id,
-      submodality_id: question.submodality_id,
-      category_id: question.category_id
-    })
-
     // Use the full_name field provided by the backend
     return question.full_name || question.category_name || "Sin categoría"
   }
