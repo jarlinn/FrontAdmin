@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -14,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { User, Lock, Save, AlertCircle, CheckCircle2, HelpCircle, Mail, Clock, X } from "lucide-react"
+import { User, Lock, Save, AlertCircle, CheckCircle2, HelpCircle, Mail, Clock, X, MessageSquare, Phone, MapPin, Globe, Facebook, Instagram, Twitter } from "lucide-react"
 import Link from "next/link"
 import { useEffect as useReactEffect } from "react"
 import AdminLayout from "@/components/admin-layout"
@@ -42,6 +44,32 @@ interface PasswordUpdateData {
   confirm_password: string
 }
 
+interface GreetingConfig {
+  greeting_message: string
+  greeting_enabled: boolean
+}
+
+interface ContactConfig {
+  office_name: string
+  faculty_name: string
+  university_name: string
+  campus_location: string
+  building_name: string
+  floor_office: string
+  street_address: string
+  city: string
+  state: string
+  country: string
+  director_name: string
+  contact_phone: string
+  contact_email: string
+  website_url: string
+  office_hours: string
+  social_facebook: string
+  social_instagram: string
+  social_twitter: string
+}
+
 export default function SettingsPage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [profileForm, setProfileForm] = useState<ProfileUpdateData>({})
@@ -67,13 +95,51 @@ export default function SettingsPage() {
   const [emailChangeSuccess, setEmailChangeSuccess] = useState<string | false>(false)
   const [emailChangeError, setEmailChangeError] = useState('')
 
+  // Estados para configuración de saludo
+  const [greetingConfig, setGreetingConfig] = useState<GreetingConfig>({
+    greeting_message: '',
+    greeting_enabled: true
+  })
+  const [greetingSuccess, setGreetingSuccess] = useState(false)
+  const [greetingError, setGreetingError] = useState<string | null>(null)
+
+  // Estados para configuración de información de contacto
+  const [contactConfig, setContactConfig] = useState<ContactConfig>({
+    office_name: '',
+    faculty_name: '',
+    university_name: '',
+    campus_location: '',
+    building_name: '',
+    floor_office: '',
+    street_address: '',
+    city: '',
+    state: '',
+    country: '',
+    director_name: '',
+    contact_phone: '',
+    contact_email: '',
+    website_url: '',
+    office_hours: '',
+    social_facebook: '',
+    social_instagram: '',
+    social_twitter: ''
+  })
+  const [contactSuccess, setContactSuccess] = useState(false)
+  const [contactError, setContactError] = useState<string | null>(null)
+
   const { fetchData: fetchProfile, loading: profileLoading, error: profileError } = useAuthFetch()
   const { fetchData: updateProfile, loading: updateProfileLoading, error: updateProfileError } = useAuthFetch()
   const { fetchData: updatePassword, loading: updatePasswordLoading, error: updatePasswordError } = useAuthFetch()
+  const { fetchData: fetchGreeting, loading: greetingLoading } = useAuthFetch()
+  const { fetchData: updateGreeting, loading: updateGreetingLoading } = useAuthFetch()
+  const { fetchData: fetchContact, loading: contactLoading } = useAuthFetch()
+  const { fetchData: updateContact, loading: updateContactLoading } = useAuthFetch()
 
-  // Cargar perfil del usuario al montar el componente
+  // Cargar perfil del usuario y configuraciones al montar el componente
   useEffect(() => {
     loadUserProfile()
+    loadGreetingConfig()
+    loadContactConfig()
   }, [])
 
   // Timer para expiración del token de cambio de email
@@ -109,6 +175,24 @@ export default function SettingsPage() {
       })
     } catch (error) {
       console.error('Error loading user profile:', error)
+    }
+  }
+
+  const loadGreetingConfig = async () => {
+    try {
+      const config = await fetchGreeting(`${API_CONFIG.BASE_URL}/chat/config/greeting`)
+      setGreetingConfig(config)
+    } catch (error) {
+      console.error('Error loading greeting config:', error)
+    }
+  }
+
+  const loadContactConfig = async () => {
+    try {
+      const config = await fetchContact(`${API_CONFIG.BASE_URL}/chat/config/contact`)
+      setContactConfig(config)
+    } catch (error) {
+      console.error('Error loading contact config:', error)
     }
   }
 
@@ -292,6 +376,50 @@ export default function SettingsPage() {
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  const handleGreetingUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setGreetingSuccess(false)
+    setGreetingError(null)
+
+    try {
+      await updateGreeting(`${API_CONFIG.BASE_URL}/chat/config/greeting`, {
+        method: 'PATCH',
+        body: JSON.stringify(greetingConfig)
+      })
+
+      setGreetingSuccess(true)
+
+      // Limpiar mensaje de éxito después de 3 segundos
+      setTimeout(() => setGreetingSuccess(false), 3000)
+    } catch (error) {
+      console.error('Error updating greeting config:', error)
+      setGreetingError('Error al actualizar la configuración del saludo')
+      setTimeout(() => setGreetingError(null), 5000)
+    }
+  }
+
+  const handleContactUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setContactSuccess(false)
+    setContactError(null)
+
+    try {
+      await updateContact(`${API_CONFIG.BASE_URL}/chat/config/contact`, {
+        method: 'PATCH',
+        body: JSON.stringify(contactConfig)
+      })
+
+      setContactSuccess(true)
+
+      // Limpiar mensaje de éxito después de 3 segundos
+      setTimeout(() => setContactSuccess(false), 3000)
+    } catch (error) {
+      console.error('Error updating contact config:', error)
+      setContactError('Error al actualizar la información de contacto')
+      setTimeout(() => setContactError(null), 5000)
+    }
   }
 
   return (
@@ -591,6 +719,364 @@ export default function SettingsPage() {
                 )}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Configuración de Saludo Inicial */}
+        <Card className="backdrop-blur-sm bg-card/80 border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <MessageSquare className="h-5 w-5" />
+              <span>Saludo Inicial del Chatbot</span>
+            </CardTitle>
+            <CardDescription>Configura el mensaje de bienvenida que verán los usuarios al iniciar una conversación</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {greetingLoading ? (
+              <div className="space-y-4">
+                <div className="h-4 bg-muted animate-pulse rounded" />
+                <div className="h-20 bg-muted animate-pulse rounded" />
+              </div>
+            ) : (
+              <form onSubmit={handleGreetingUpdate} className="space-y-6">
+                {greetingSuccess && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      Configuración de saludo actualizada exitosamente
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {greetingError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{greetingError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="flex items-center justify-between space-x-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="greeting-enabled" className="text-base">
+                      Habilitar Saludo
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Activa o desactiva el mensaje de bienvenida
+                    </p>
+                  </div>
+                  <Switch
+                    id="greeting-enabled"
+                    checked={greetingConfig.greeting_enabled}
+                    onCheckedChange={(checked) =>
+                      setGreetingConfig(prev => ({ ...prev, greeting_enabled: checked }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="greeting-message">Mensaje de Saludo</Label>
+                  <Textarea
+                    id="greeting-message"
+                    value={greetingConfig.greeting_message}
+                    onChange={(e) =>
+                      setGreetingConfig(prev => ({ ...prev, greeting_message: e.target.value }))
+                    }
+                    placeholder="Escribe el mensaje de bienvenida para los usuarios..."
+                    className="bg-background/50 border-gray-300 focus:border-red-400 min-h-[120px]"
+                    disabled={!greetingConfig.greeting_enabled}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Este mensaje se mostrará cuando un usuario inicie una conversación con el chatbot
+                  </p>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                  disabled={updateGreetingLoading}
+                >
+                  {updateGreetingLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Actualizando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar Configuración
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Información de Contacto */}
+        <Card className="backdrop-blur-sm bg-card/80 border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Phone className="h-5 w-5" />
+              <span>Información de Contacto</span>
+            </CardTitle>
+            <CardDescription>Configura la información de contacto que se mostrará a los usuarios</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {contactLoading ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="h-10 bg-muted animate-pulse rounded" />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleContactUpdate} className="space-y-6">
+                {contactSuccess && (
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800">
+                      Información de contacto actualizada exitosamente
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {contactError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{contactError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="office-name">Nombre de la Oficina</Label>
+                    <Input
+                      id="office-name"
+                      value={contactConfig.office_name}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, office_name: e.target.value }))}
+                      placeholder="Oficina Administrativa..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="faculty-name">Nombre de la Facultad</Label>
+                    <Input
+                      id="faculty-name"
+                      value={contactConfig.faculty_name}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, faculty_name: e.target.value }))}
+                      placeholder="Facultad de Ingeniería..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="university-name">Nombre de la Universidad</Label>
+                    <Input
+                      id="university-name"
+                      value={contactConfig.university_name}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, university_name: e.target.value }))}
+                      placeholder="Universidad Francisco de Paula Santander..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="campus-location">Ubicación del Campus</Label>
+                    <Input
+                      id="campus-location"
+                      value={contactConfig.campus_location}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, campus_location: e.target.value }))}
+                      placeholder="Campus Central..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="building-name">Nombre del Edificio</Label>
+                    <Input
+                      id="building-name"
+                      value={contactConfig.building_name}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, building_name: e.target.value }))}
+                      placeholder="Edificio de Ingenierías..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="floor-office">Piso y Oficina</Label>
+                    <Input
+                      id="floor-office"
+                      value={contactConfig.floor_office}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, floor_office: e.target.value }))}
+                      placeholder="Piso 2, Oficina 201..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="street-address">Dirección</Label>
+                    <Input
+                      id="street-address"
+                      value={contactConfig.street_address}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, street_address: e.target.value }))}
+                      placeholder="Av. Gran Colombia No. 12E-96..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="city">Ciudad</Label>
+                    <Input
+                      id="city"
+                      value={contactConfig.city}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, city: e.target.value }))}
+                      placeholder="Cúcuta..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="state">Estado/Departamento</Label>
+                    <Input
+                      id="state"
+                      value={contactConfig.state}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, state: e.target.value }))}
+                      placeholder="Norte de Santander..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="country">País</Label>
+                    <Input
+                      id="country"
+                      value={contactConfig.country}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, country: e.target.value }))}
+                      placeholder="Colombia..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="director-name">Nombre del Director</Label>
+                    <Input
+                      id="director-name"
+                      value={contactConfig.director_name}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, director_name: e.target.value }))}
+                      placeholder=""
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-phone">Teléfono de Contacto</Label>
+                    <Input
+                      id="contact-phone"
+                      value={contactConfig.contact_phone}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, contact_phone: e.target.value }))}
+                      placeholder="+57 (7) 5776655..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-email">Correo Electrónico</Label>
+                    <Input
+                      id="contact-email"
+                      type="email"
+                      value={contactConfig.contact_email}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, contact_email: e.target.value }))}
+                      placeholder="oficina.sistemas@ufps.edu.co..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="website-url">Sitio Web</Label>
+                    <Input
+                      id="website-url"
+                      value={contactConfig.website_url}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, website_url: e.target.value }))}
+                      placeholder="www.ufps.edu.co/ingenieria/sistemas..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="office-hours">Horario de Oficina</Label>
+                    <Textarea
+                      id="office-hours"
+                      value={contactConfig.office_hours}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, office_hours: e.target.value }))}
+                      placeholder="Lunes a Viernes de 8:00 a.m. a 12:00 m. y de 2:00 p.m. a 5:00 p.m...."
+                      className="bg-background/50 border-gray-300 focus:border-red-400 min-h-[80px]"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="social-facebook" className="flex items-center space-x-2">
+                      <Facebook className="h-4 w-4" />
+                      <span>Facebook</span>
+                    </Label>
+                    <Input
+                      id="social-facebook"
+                      value={contactConfig.social_facebook}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, social_facebook: e.target.value }))}
+                      placeholder="https://facebook.com/ufps..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="social-instagram" className="flex items-center space-x-2">
+                      <Instagram className="h-4 w-4" />
+                      <span>Instagram</span>
+                    </Label>
+                    <Input
+                      id="social-instagram"
+                      value={contactConfig.social_instagram}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, social_instagram: e.target.value }))}
+                      placeholder="https://instagram.com/ufps_oficial..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="social-twitter" className="flex items-center space-x-2">
+                      <Twitter className="h-4 w-4" />
+                      <span>Twitter/X</span>
+                    </Label>
+                    <Input
+                      id="social-twitter"
+                      value={contactConfig.social_twitter}
+                      onChange={(e) => setContactConfig(prev => ({ ...prev, social_twitter: e.target.value }))}
+                      placeholder="https://twitter.com/UFPS_Cucuta..."
+                      className="bg-background/50 border-gray-300 focus:border-red-400"
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                  disabled={updateContactLoading}
+                >
+                  {updateContactLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Actualizando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar Información de Contacto
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>
