@@ -456,10 +456,36 @@ export default function ContentPage() {
     }
   }, [contextType])
 
+  // Función para manejo de archivos de documentos
+  const onDropDocument = useCallback((acceptedFiles: File[]) => {
+    setUploadedFiles([])
+
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0]
+      const uploadedFile: UploadedFile = {
+        file,
+        preview: file.name,
+        id: Math.random().toString(36).substr(2, 9)
+      }
+      setUploadedFiles([uploadedFile])
+    }
+  }, [])
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'application/pdf': ['.pdf']
+    },
+    multiple: false
+  })
+
+  const { getRootProps: getDocumentRootProps, getInputProps: getDocumentInputProps, isDragActive: isDocumentDragActive } = useDropzone({
+    onDrop: onDropDocument,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'text/plain': ['.txt']
     },
     multiple: false
   })
@@ -600,6 +626,107 @@ export default function ContentPage() {
     }
   }
 
+  // Función para subir documento
+  const handleUploadDocument = async () => {
+    if (!question.trim()) {
+      setErrorMessage('Debes escribir el texto de la pregunta')
+      setShowErrorDialog(true)
+      return
+    }
+    if (uploadedFiles.length === 0) {
+      setErrorMessage('Debes subir un archivo')
+      setShowErrorDialog(true)
+      return
+    }
+    if (!selectedModalityId) {
+      setErrorMessage('Debes seleccionar una modalidad')
+      setShowErrorDialog(true)
+      return
+    }
+
+    setIsGenerating(true)
+    setGenerationProgress(0)
+
+    try {
+      const formData = new FormData()
+      formData.append('question_text', question)
+      formData.append('file', uploadedFiles[0].file)
+      formData.append('modality_id', selectedModalityId)
+      if (selectedSubmodalityId) {
+        formData.append('submodality_id', selectedSubmodalityId)
+      }
+      if (selectedCategoryId) {
+        formData.append('category_id', selectedCategoryId)
+      }
+
+      const progressInterval = setInterval(() => {
+        setGenerationProgress(prev => Math.min(prev + 10, 90))
+      }, 500)
+
+      const response = await fetchData(buildApiUrl(API_CONFIG.ENDPOINTS.DOCUMENTS), {
+        method: 'POST',
+        body: formData
+      })
+
+      clearInterval(progressInterval)
+      setGenerationProgress(100)
+
+      if (response) {
+        console.log("Documento subido exitosamente:", response)
+        setShowSuccessDialog(true)
+      }
+    } catch (error: any) {
+      console.error("Error al subir documento:", error)
+
+      let errorMessage = "Error desconocido al subir el documento"
+
+      if (error?.status) {
+        switch (error.status) {
+          case 400:
+            errorMessage = "Datos inválidos. Verifica que todos los campos estén completos y correctos."
+            break
+          case 401:
+            errorMessage = "Sesión expirada. Por favor, inicia sesión nuevamente."
+            break
+          case 403:
+            errorMessage = "No tienes permisos para realizar esta acción."
+            break
+          case 404:
+            errorMessage = "Recurso no encontrado. Verifica la configuración del servidor."
+            break
+          case 413:
+            errorMessage = "El archivo es demasiado grande. Intenta con un archivo más pequeño."
+            break
+          case 422:
+            errorMessage = "Datos de entrada inválidos. Revisa la información proporcionada."
+            break
+          case 500:
+            errorMessage = "Error al subir el documento. Inténtalo más tarde."
+            break
+          default:
+            if (error.status >= 500) {
+              errorMessage = "Error del servidor. Inténtalo más tarde."
+            } else if (error.status >= 400) {
+              errorMessage = "Error en la solicitud. Verifica los datos e intenta nuevamente."
+            }
+        }
+      } else if (error?.message) {
+        if (error.message.includes('fetch')) {
+          errorMessage = "Error de conexión. Verifica tu conexión a internet e intenta nuevamente."
+        } else if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+          errorMessage = "La solicitud tardó demasiado. Inténtalo nuevamente."
+        } else {
+          errorMessage = error.message
+        }
+      }
+
+      setErrorMessage(errorMessage)
+      setShowErrorDialog(true)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   // Función para actualizar respuesta
   const handleUpdateResponse = async () => {
     if (!editableModelResponse.trim()) {
@@ -702,10 +829,14 @@ export default function ContentPage() {
               <h2 className="text-xl font-semibold text-muted-foreground">Gestión del Sistema</h2>
               <p className="text-sm text-muted-foreground">Administra la estructura jerárquica y genera contenido</p>
             </div>
-            <TabsList className="grid grid-cols-2">
+            <TabsList className="grid grid-cols-3">
               <TabsTrigger value="questions" className="flex items-center gap-2">
                 <Brain className="h-4 w-4" />
                 Preguntas
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Documentos
               </TabsTrigger>
               <TabsTrigger value="hierarchy" className="flex items-center gap-2">
                 <Layers className="h-4 w-4" />
@@ -1134,6 +1265,294 @@ export default function ContentPage() {
                       <p><strong>Contexto PDF:</strong></p>
                       <p className="text-muted-foreground">
                         El archivo PDF se procesará automáticamente para extraer el texto relevante.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Status Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      Estado del Sistema
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span>Modalidades:</span>
+                      <Badge variant="secondary">{modalities?.length || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Submodalidades:</span>
+                      <Badge variant="secondary">{submodalities?.length || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Categorías:</span>
+                      <Badge variant="secondary">{newCategories?.length || 0}</Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Preguntas:</span>
+                      <Badge variant="secondary">{questions?.length || 0}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Tab Content: Documentos */}
+          <TabsContent value="documents" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Main Form */}
+              <div className="lg:col-span-2 space-y-6">
+                <Card className="bg-white border-gray-200">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-black">
+                      <FileText className="h-5 w-5 text-red-600" />
+                      Subir Nuevo Documento
+                    </CardTitle>
+                    <CardDescription className="text-gray-600">
+                      Sube documentos para ofrecer archivos en lugar de respuestas generadas por IA
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Question Text Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="documentQuestion">Texto de la Pregunta *</Label>
+                      <Textarea
+                        id="documentQuestion"
+                        placeholder="¿Cuál es el texto de la pregunta para este documento?"
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
+                        rows={3}
+                        className="resize-none bg-gray-100 border-gray-300"
+                      />
+                    </div>
+
+                    {/* Hierarchical Selection */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Modalidad */}
+                      <div className="space-y-2">
+                        <Label>Modalidad *</Label>
+                        <div className="flex gap-2">
+                          <Select value={selectedModalityId} onValueChange={setSelectedModalityId}>
+                            <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
+                              <SelectValue placeholder="Selecciona modalidad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {modalities?.map((modality) => (
+                                <SelectItem key={modality.id} value={modality.id}>
+                                  {modality.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedModalityId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedModalityId("")}
+                              className="px-2"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Submodalidad */}
+                      <div className="space-y-2">
+                        <Label>Submodalidad (Opcional)</Label>
+                        <div className="flex gap-2">
+                          <Select
+                            value={selectedSubmodalityId}
+                            onValueChange={setSelectedSubmodalityId}
+                            disabled={!selectedModalityId}
+                          >
+                            <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
+                              <SelectValue placeholder="Selecciona submodalidad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {submodalitiesByModality?.map((submodality) => (
+                                <SelectItem key={submodality.id} value={submodality.id}>
+                                  {submodality.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedSubmodalityId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedSubmodalityId("")}
+                              className="px-2"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Categoría */}
+                      <div className="space-y-2">
+                        <Label>Categoría (Opcional)</Label>
+                        <div className="flex gap-2">
+                          <Select
+                            value={selectedCategoryId}
+                            onValueChange={setSelectedCategoryId}
+                            disabled={!selectedSubmodalityId}
+                          >
+                            <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
+                              <SelectValue placeholder="Selecciona categoría" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categoriesBySubmodality?.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {selectedCategoryId && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedCategoryId("")}
+                              className="px-2"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* File Upload */}
+                    <div className="space-y-4">
+                      <Label>Archivo del Documento *</Label>
+                      {uploadedFiles.length === 0 ? (
+                        <div
+                          {...getDocumentRootProps()}
+                          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                            isDocumentDragActive
+                              ? "border-primary bg-primary/5"
+                              : "border-muted-foreground/25 hover:border-primary/50"
+                          }`}
+                        >
+                          <input {...getDocumentInputProps()} />
+                          <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            {isDocumentDragActive
+                              ? "Suelta el archivo aquí..."
+                              : "Arrastra un archivo aquí o haz clic para seleccionar"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Formatos soportados: PDF, DOC, DOCX, TXT, etc.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label>Archivo subido:</Label>
+                          <div className="space-y-2">
+                            {uploadedFiles.map((uploadedFile) => (
+                              <div
+                                key={uploadedFile.id}
+                                className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4" />
+                                  <span className="text-sm">{uploadedFile.preview}</span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => removeFile(uploadedFile.id)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload Document Button */}
+                    <Button
+                      onClick={handleUploadDocument}
+                      disabled={isGenerating || uploadedFiles.length === 0 || !question.trim() || !selectedModalityId}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white"
+                      size="lg"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Subiendo...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Subir Documento
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Validation Message */}
+                    {!selectedModalityId && (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          <strong>Nota:</strong> Debes seleccionar al menos una modalidad para subir el documento.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Upload Progress */}
+                    {isGenerating && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Subiendo documento...</span>
+                          <span>{generationProgress}%</span>
+                        </div>
+                        <Progress value={generationProgress} className="w-full" />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-6">
+                {/* Tips Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">💡 Consejos</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="space-y-2">
+                      <p><strong>Jerarquía:</strong></p>
+                      <p className="text-muted-foreground">
+                        Modalidad → Submodalidad → Categoría
+                      </p>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      <p><strong>Documentos:</strong></p>
+                      <ul className="text-muted-foreground space-y-1">
+                        <li>• Sube archivos relevantes para las preguntas</li>
+                        <li>• Asegúrate de que el texto de la pregunta sea claro</li>
+                        <li>• Usa la jerarquía correcta para organizar</li>
+                      </ul>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      <p><strong>Formatos soportados:</strong></p>
+                      <p className="text-muted-foreground">
+                        PDF, DOC, DOCX, TXT y otros formatos comunes.
                       </p>
                     </div>
                   </CardContent>
@@ -1895,38 +2314,61 @@ export default function ContentPage() {
         <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
           <AlertDialogContent className="bg-white border-red-200">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-black">¡Pregunta creada exitosamente!</AlertDialogTitle>
+              <AlertDialogTitle className="text-black">
+                {currentQuestionId ? "¡Pregunta creada exitosamente!" : "¡Documento subido exitosamente!"}
+              </AlertDialogTitle>
               <AlertDialogDescription className="text-gray-600">
-                La pregunta ha sido guardada correctamente. ¿Deseas ir a la página de validación?
+                {currentQuestionId
+                  ? "La pregunta ha sido guardada correctamente. ¿Deseas ir a la página de validación?"
+                  : "El documento ha sido subido correctamente."
+                }
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel className="border-red-300 text-black hover:bg-red-50">
                 Quedarme aquí
               </AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-red-600 hover:bg-red-700 text-white"
-                onClick={() => {
-                  // Reset form
-                  setQuestion("")
-                  setContext("")
-                  setUploadedFiles([])
-                  setGeneratedResponse("")
-                  setEditableModelResponse("")
-                  setIsEditingResponse(false)
-                  setShowPreview(false)
-                  setSelectedCategoryId("")
-                  setSelectedModalityId("")
-                  setSelectedSubmodalityId("")
-                  setSelectedPath([])
-                  setCurrentQuestionId(null)
-                  setShowSuccessDialog(false)
-                  // Redirect to validation page
-                  router.push('/dashboard/validation')
-                }}
-              >
-                Ir a Validación
-              </AlertDialogAction>
+              {currentQuestionId && (
+                <AlertDialogAction
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => {
+                    // Reset form
+                    setQuestion("")
+                    setContext("")
+                    setUploadedFiles([])
+                    setGeneratedResponse("")
+                    setEditableModelResponse("")
+                    setIsEditingResponse(false)
+                    setShowPreview(false)
+                    setSelectedCategoryId("")
+                    setSelectedModalityId("")
+                    setSelectedSubmodalityId("")
+                    setSelectedPath([])
+                    setCurrentQuestionId(null)
+                    setShowSuccessDialog(false)
+                    // Redirect to validation page
+                    router.push('/dashboard/validation')
+                  }}
+                >
+                  Ir a Validación
+                </AlertDialogAction>
+              )}
+              {!currentQuestionId && (
+                <AlertDialogAction
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => {
+                    // Reset form
+                    setQuestion("")
+                    setUploadedFiles([])
+                    setSelectedCategoryId("")
+                    setSelectedModalityId("")
+                    setSelectedSubmodalityId("")
+                    setShowSuccessDialog(false)
+                  }}
+                >
+                  Subir Otro Documento
+                </AlertDialogAction>
+              )}
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

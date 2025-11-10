@@ -30,6 +30,7 @@ export const API_CONFIG = {
     // Chatbot
     QUESTIONS: '/chat/questions/',
     QUESTIONS_NO_SLASH: '/chat/questions',
+    DOCUMENTS: '/chat/documents',
     CATEGORIES: '/chat/categories/',
   },
   

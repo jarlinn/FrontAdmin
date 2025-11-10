@@ -51,10 +51,13 @@ import {
   ChevronUp,
   MoreHorizontal,
 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AdminLayout from "@/components/admin-layout"
 import { useDropzone } from "react-dropzone"
 import { useQuestions } from "@/hooks/use-questions"
 import { Question, QuestionFilters, UpdateQuestionRequest } from "@/lib/questions"
+import { useDocuments } from "@/hooks/use-documents"
+import { Document, DocumentFilters } from "@/lib/documents"
 import { useModalities } from "@/hooks/use-modalities"
 import { useSubmodalities, useSubmodalitiesByModality } from "@/hooks/use-submodalities"
 import { useNewCategories, useCategoriesBySubmodality } from "@/hooks/use-new-categories"
@@ -65,7 +68,6 @@ import { buildApiUrl } from "@/lib/api-config"
 
 const statusOptions = [
   { value: "all", label: "Todos los estados" },
-  { value: "PENDING", label: "Pendiente" },
   { value: "APPROVED", label: "Aprobado" },
   { value: "DISABLED", label: "Rechazado" },
 ]
@@ -83,9 +85,11 @@ export default function ValidationPage() {
   const [modalityFilter, setModalityFilter] = useState("all")
   const [submodalityFilter, setSubmodalityFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [activeTab, setActiveTab] = useState("questions")
 
   // Hooks para datos reales
   const { questions, pagination, loading, error, refreshQuestions, updateQuestionStatus, updateQuestion, recalculateQuestion, deleteQuestion, applyFilters, goToPage } = useQuestions()
+  const { documents, pagination: documentsPagination, loading: documentsLoading, error: documentsError, refreshDocuments, updateDocumentStatus: updateDocStatus, deleteDocument, applyFilters: applyDocFilters, goToPage: goToDocPage } = useDocuments()
 
   // Filtrar preguntas únicas por question_id
   const uniqueQuestions = useMemo(() => {
@@ -129,9 +133,30 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
   const [expandedResponses, setExpandedResponses] = useState<Set<string>>(new Set())
   const [truncatedResponses, setTruncatedResponses] = useState<Set<string>>(new Set())
 
+  // Estados para documentos
+  const [approvingDocument, setApprovingDocument] = useState<string | null>(null)
+  const [rejectingDocument, setRejectingDocument] = useState<string | null>(null)
+  const [disablingDocument, setDisablingDocument] = useState<string | null>(null)
+  const [deletingDocument, setDeletingDocument] = useState<Document | null>(null)
+  const [isDeleteDocumentDialogOpen, setIsDeleteDocumentDialogOpen] = useState(false)
+
+  // Estados para edición de documentos
+  const [editingDocument, setEditingDocument] = useState<Document | null>(null)
+  const [isEditDocumentDialogOpen, setIsEditDocumentDialogOpen] = useState(false)
+  const [editedDocumentQuestionText, setEditedDocumentQuestionText] = useState("")
+  const [editedDocumentModalityId, setEditedDocumentModalityId] = useState("")
+  const [editedDocumentSubmodalityId, setEditedDocumentSubmodalityId] = useState("")
+  const [editedDocumentCategoryId, setEditedDocumentCategoryId] = useState("")
+  const [editedDocumentFiles, setEditedDocumentFiles] = useState<EditUploadedFile[]>([])
+  const [isSavingDocument, setIsSavingDocument] = useState(false)
+
   // Hooks para edición jerárquica
   const { submodalities: editSubmodalitiesByModality, loading: editSubmodalitiesByModalityLoading } = useSubmodalitiesByModality(editedModalityId || "")
   const { categories: editCategoriesBySubmodality, loading: editCategoriesBySubmodalityLoading } = useCategoriesBySubmodality(editedSubmodalityId || "")
+
+  // Hooks para edición jerárquica de documentos
+  const { submodalities: editDocumentSubmodalitiesByModality, loading: editDocumentSubmodalitiesByModalityLoading } = useSubmodalitiesByModality(editedDocumentModalityId || "")
+  const { categories: editDocumentCategoriesBySubmodality, loading: editDocumentCategoriesBySubmodalityLoading } = useCategoriesBySubmodality(editedDocumentSubmodalityId || "")
 
   // Función para detectar si el contenido está truncado
   const checkIfTruncated = (element: HTMLElement) => {
@@ -173,6 +198,33 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
     return () => clearTimeout(timeoutId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, statusFilter, modalityFilter, submodalityFilter, categoryFilter])
+
+  // Aplicar filtros para documentos con debounce
+  useEffect(() => {
+    if (activeTab === "documents") {
+      const timeoutId = setTimeout(() => {
+        const filters: DocumentFilters = {}
+
+        // Siempre incluir status (el backend maneja "all" como mostrar todos)
+        filters.status = statusFilter as "APPROVED" | "DISABLED" | "all"
+
+        // Filtros jerárquicos
+        filters.modality_id = modalityFilter === "all" ? "" : modalityFilter
+        filters.submodality_id = submodalityFilter === "all" ? "" : submodalityFilter
+        filters.category_id = categoryFilter === "all" ? "" : categoryFilter
+
+        filters.search = searchTerm.trim()
+
+        console.log('🔍 Enviando filtros de documentos al backend:', filters)
+
+        // Llamar directamente a applyDocFilters
+        applyDocFilters(filters)
+      }, 300) // Debounce de 300ms
+
+      return () => clearTimeout(timeoutId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, searchTerm, statusFilter, modalityFilter, submodalityFilter, categoryFilter])
 
 
 
@@ -455,11 +507,11 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
 
   const handleDownloadDocument = async () => {
     if (!previewingDocument?.question_id) return
-    
+
     try {
       const fileUrl = buildApiUrl(`/chat/questions/${previewingDocument.question_id}/file`)
       const response = await authService.authenticatedFetch(fileUrl)
-      
+
       if (!response.ok) {
         throw new Error(`Error al descargar documento: ${response.status}`)
       }
@@ -473,7 +525,144 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      
+
+    } catch (error) {
+      console.error("Error al descargar documento:", error)
+    }
+  }
+
+  // Funciones para manejar documentos
+  const handleDocumentStatusChange = async (documentId: string, newStatus: "APPROVED" | "DISABLED") => {
+    try {
+      // Establecer el estado de carga apropiado
+      if (newStatus === "APPROVED") {
+        setApprovingDocument(documentId)
+      } else if (newStatus === "DISABLED") {
+        setRejectingDocument(documentId)
+      }
+
+      const action = newStatus === "APPROVED" ? "approve" : "disable"
+      await updateDocStatus(documentId, action)
+
+      // Opcional: mostrar mensaje de éxito
+      console.log(`Documento ${newStatus === "APPROVED" ? "aprobado" : "rechazado"} exitosamente`)
+
+    } catch (error) {
+      console.error("Error al actualizar estado del documento:", error)
+      // Aquí podrías mostrar un toast o notificación de error
+    } finally {
+      // Limpiar estados de carga
+      setApprovingDocument(null)
+      setRejectingDocument(null)
+    }
+  }
+
+  const handleDocumentDelete = (document: Document) => {
+    setDeletingDocument(document)
+    setIsDeleteDocumentDialogOpen(true)
+  }
+
+  const handleDocumentEdit = (document: Document) => {
+    setEditingDocument(document)
+    setEditedDocumentQuestionText(document.question_text)
+    setEditedDocumentModalityId(document.modality_id || "")
+    setEditedDocumentSubmodalityId(document.submodality_id || "")
+    setEditedDocumentCategoryId(document.category_id || "")
+    setEditedDocumentFiles([])
+    setIsEditDocumentDialogOpen(true)
+  }
+
+  const handleSaveDocumentEdit = async () => {
+    if (!editingDocument) return
+
+    try {
+      setIsSavingDocument(true)
+
+      const formData = new FormData()
+      formData.append('question_text', editedDocumentQuestionText)
+      formData.append('modality_id', editedDocumentModalityId)
+      if (editedDocumentSubmodalityId) {
+        formData.append('submodality_id', editedDocumentSubmodalityId)
+      }
+      if (editedDocumentCategoryId) {
+        formData.append('category_id', editedDocumentCategoryId)
+      }
+
+      // Agregar archivo si hay uno nuevo seleccionado
+      if (editedDocumentFiles.length > 0) {
+        formData.append('file', editedDocumentFiles[0].file)
+      }
+
+      const response = await authService.authenticatedFetch(
+        buildApiUrl(`/chat/documents/${editingDocument.document_id}`),
+        {
+          method: 'PATCH',
+          body: formData
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`Error al actualizar documento: ${response.status}`)
+      }
+
+      // Refrescar la lista de documentos
+      await refreshDocuments()
+
+      // Cerrar el diálogo
+      handleCloseDocumentEdit()
+
+    } catch (error) {
+      console.error("Error al guardar cambios del documento:", error)
+    } finally {
+      setIsSavingDocument(false)
+    }
+  }
+
+  const handleCloseDocumentEdit = () => {
+    setEditingDocument(null)
+    setEditedDocumentQuestionText("")
+    setEditedDocumentModalityId("")
+    setEditedDocumentSubmodalityId("")
+    setEditedDocumentCategoryId("")
+    setEditedDocumentFiles([])
+    setIsEditDocumentDialogOpen(false)
+  }
+
+  const confirmDeleteDocument = async () => {
+    if (deletingDocument) {
+      try {
+        await deleteDocument(deletingDocument.document_id)
+        setDeletingDocument(null)
+        setIsDeleteDocumentDialogOpen(false)
+      } catch (error) {
+        console.error("Error al eliminar documento:", error)
+        setDeletingDocument(null)
+        setIsDeleteDocumentDialogOpen(false)
+      }
+    }
+  }
+
+  const handleDocumentDownload = async (document: Document) => {
+    try {
+      const fileUrl = buildApiUrl(`/chat/documents/${document.document_id}/file`)
+      const response = await authService.authenticatedFetch(fileUrl)
+
+      if (!response.ok) {
+        throw new Error(`Error al descargar documento: ${response.status}`)
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = window.document.createElement('a')
+      a.href = url
+      a.download = document.file_name
+      if (window.document.body) {
+        window.document.body.appendChild(a)
+        a.click()
+        window.document.body.removeChild(a)
+      }
+      URL.revokeObjectURL(url)
+
     } catch (error) {
       console.error("Error al descargar documento:", error)
     }
@@ -485,17 +674,38 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
     <AdminLayout>
       <div className="space-y-6">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Validación de Respuestas</h1>
-          <p className="text-muted-foreground">Revisa y valida las respuestas generadas por la IA</p>
+          <h1 className="text-3xl font-bold text-foreground">Validación de Contenido</h1>
+          <p className="text-muted-foreground">Revisa y valida las respuestas generadas por la IA y los documentos subidos</p>
         </div>
 
-        <Card className="bg-white border-gray-200 shadow-md">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center space-x-2 text-lg text-black">
-              <Filter className="h-5 w-5 text-red-600" />
-              <span>Filtros y Búsqueda</span>
-            </CardTitle>
-          </CardHeader>
+        {/* Tabs para validación */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-muted-foreground">Validación del Sistema</h2>
+              <p className="text-sm text-muted-foreground">Administra y valida preguntas y documentos</p>
+            </div>
+            <TabsList className="grid grid-cols-2">
+              <TabsTrigger value="questions" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Preguntas
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Documentos
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* Tab Content: Preguntas */}
+          <TabsContent value="questions" className="space-y-6">
+            <Card className="bg-white border-gray-200 shadow-md">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center space-x-2 text-lg text-black">
+                  <Filter className="h-5 w-5 text-red-600" />
+                  <span>Filtros y Búsqueda - Preguntas</span>
+                </CardTitle>
+              </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {/* Primera fila: Buscar, Estado */}
@@ -921,31 +1131,441 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
           </Card>
         )}
 
-        {pagination && pagination.total_pages > 1 && (
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Página {pagination.page} de {pagination.total_pages} ({pagination.total_items} elementos total)
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => goToPage(pagination.page - 1)}
-                disabled={!pagination.has_previous || loading}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => goToPage(pagination.page + 1)}
-                disabled={!pagination.has_next || loading}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+            {pagination && pagination.total_pages > 1 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Página {pagination.page} de {pagination.total_pages} ({pagination.total_items} elementos total)
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(pagination.page - 1)}
+                    disabled={!pagination.has_previous || loading}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(pagination.page + 1)}
+                    disabled={!pagination.has_next || loading}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Tab Content: Documentos */}
+          <TabsContent value="documents" className="space-y-6">
+            <Card className="bg-white border-gray-200 shadow-md">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center space-x-2 text-lg text-black">
+                  <Filter className="h-5 w-5 text-blue-600" />
+                  <span>Filtros y Búsqueda - Documentos</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Primera fila: Buscar, Estado */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Buscar</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
+                        <Input
+                          placeholder="Buscar documentos..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10 bg-gray-100 border-gray-300 h-10"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm">Estado</Label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="bg-background/50 h-10 focus:ring-blue-300 focus:ring-2">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value} className="focus:bg-blue-50 focus:text-blue-900">
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Segunda fila: Modalidad, Submodalidad, Categoría, Resultados */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm">Modalidad</Label>
+                      <Select value={modalityFilter} onValueChange={(value) => {
+                        setModalityFilter(value)
+                        setSubmodalityFilter("all") // Reset submodality when modality changes
+                        setCategoryFilter("all") // Reset category when modality changes
+                      }}>
+                        <SelectTrigger className="bg-background/50 h-10 focus:ring-blue-300 focus:ring-2" disabled={modalitiesLoading}>
+                          <SelectValue placeholder="Todas las modalidades" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="focus:bg-blue-50 focus:text-blue-900">Todas las modalidades</SelectItem>
+                          {modalities?.map((modality) => (
+                            <SelectItem key={modality.id} value={modality.id} className="focus:bg-blue-50 focus:text-blue-900">
+                              {modality.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm">Submodalidad</Label>
+                      <Select
+                        value={submodalityFilter}
+                        onValueChange={(value) => {
+                          setSubmodalityFilter(value)
+                          setCategoryFilter("all") // Reset category when submodality changes
+                        }}
+                        disabled={modalityFilter === "all" || submodalitiesByModalityLoading}
+                      >
+                        <SelectTrigger className="bg-background/50 h-10 focus:ring-blue-300 focus:ring-2">
+                          <SelectValue placeholder="Todas las submodalidades" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="focus:bg-blue-50 focus:text-blue-900">Todas las submodalidades</SelectItem>
+                          {submodalitiesByModality?.map((submodality) => (
+                            <SelectItem key={submodality.id} value={submodality.id} className="focus:bg-blue-50 focus:text-blue-900">
+                              {submodality.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm">Categoría</Label>
+                      <Select
+                        value={categoryFilter}
+                        onValueChange={setCategoryFilter}
+                        disabled={categoriesBySubmodalityLoading || submodalityFilter === "all"}
+                      >
+                        <SelectTrigger className="bg-background/50 h-10 focus:ring-blue-300 focus:ring-2">
+                          <SelectValue placeholder={categoriesBySubmodalityLoading ? "Cargando categorías..." : "Todas las categorías"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all" className="focus:bg-blue-50 focus:text-blue-900">
+                            Todas las categorías
+                          </SelectItem>
+                          {categoriesBySubmodality?.map((category) => (
+                            <SelectItem key={category.id} value={category.id} className="focus:bg-blue-50 focus:text-blue-900">
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm">Resultados</Label>
+                      <div className="flex items-center h-10 px-3 bg-muted/30 rounded-md">
+                        <span className="text-sm text-muted-foreground">
+                          {documentsPagination ? `${documentsPagination.total_items} elementos` : `${documents.length} elementos`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {documentsLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                <span>Cargando documentos...</span>
+              </div>
+            ) : documentsError ? (
+              <div className="text-center p-8">
+                <div className="text-red-600 dark:text-red-400 mb-2">Error al cargar documentos</div>
+                <div className="text-sm text-muted-foreground mb-4">{documentsError}</div>
+                <Button onClick={() => refreshDocuments()} variant="outline">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reintentar
+                </Button>
+              </div>
+            ) : (
+              <Card className="bg-white border-gray-200 shadow-md">
+                <CardContent className="p-0">
+                  {/* Encabezados de la tabla - Responsivo */}
+                  <div className="hidden md:grid grid-cols-12 gap-3 lg:gap-4 p-4 border-b border-gray-200 bg-gray-50">
+                    <div className="col-span-6 lg:col-span-6 xl:col-span-6 text-sm font-medium text-muted-foreground">
+                      Pregunta / Archivo
+                    </div>
+                    <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground">
+                      Estado
+                    </div>
+                    <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground">
+                      Modalidad / Tipo
+                    </div>
+                    <div className="col-span-2 lg:col-span-2 xl:col-span-2 text-sm font-medium text-muted-foreground text-right">
+                      Acciones
+                    </div>
+                  </div>
+
+                  {/* Filas de datos */}
+                  <div className="space-y-3 p-4">
+                    {documents.map((document) => (
+                      <Card
+                        key={document.document_id}
+                        className="bg-white border-gray-200 hover:bg-gray-50 transition-all duration-200 hover:shadow-md"
+                      >
+                        <CardContent className="p-4">
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 lg:gap-4">
+                        {/* Columna: Pregunta / Archivo */}
+                        <div className="md:col-span-6 lg:col-span-6 xl:col-span-6 space-y-2">
+                          <div>
+                            <h3 className="font-semibold text-sm leading-tight mb-1">
+                              {document.question_text}
+                            </h3>
+                            <div className="text-xs text-muted-foreground">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <FileText className="h-3 w-3" />
+                                <span className="font-medium">{document.file_name}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Información adicional en móvil/tablet */}
+                          <div className="lg:hidden mt-3 pt-3 border-t border-border/30">
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              {getStatusBadge(document.status)}
+                              <Badge variant="outline" className="text-xs">
+                                {document.full_name}
+                              </Badge>
+                              <Badge
+                                variant="default"
+                                className="text-xs"
+                              >
+                                {document.file_type.split('/')[1]?.toUpperCase() || 'FILE'}
+                              </Badge>
+                              <div className="flex items-center space-x-1 text-muted-foreground">
+                                <Calendar className="h-3 w-3" />
+                                <span>{new Date(document.created_at).toLocaleDateString()}</span>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDocumentDownload(document)}
+                                className="h-6 w-6 p-0"
+                                title="Descargar documento"
+                              >
+                                <Download className="h-3 w-3 text-blue-600" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Columna: Estado */}
+                        <div className="hidden md:flex md:col-span-2 lg:col-span-2 xl:col-span-2 flex-col justify-start space-y-1">
+                          {getStatusBadge(document.status)}
+                          <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            <span>{new Date(document.created_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+
+                        {/* Columna: Modalidad / Tipo */}
+                        <div className="hidden md:flex md:col-span-2 lg:col-span-2 xl:col-span-2 flex-col justify-start space-y-1">
+                          <Badge variant="outline" className="text-xs w-full text-left whitespace-normal break-words" title={document.full_name}>
+                            {document.full_name}
+                          </Badge>
+                          <Badge
+                            variant="default"
+                            className="text-xs w-fit"
+                          >
+                            {document.file_type.split('/')[1]?.toUpperCase() || 'FILE'}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDocumentDownload(document)}
+                            className="h-6 w-6 p-0 self-start"
+                            title="Descargar documento"
+                          >
+                            <Download className="h-3 w-3 text-blue-600" />
+                          </Button>
+                        </div>
+
+                        {/* Columna: Acciones */}
+                      <div className="md:col-span-2 lg:col-span-2 xl:col-span-2 flex flex-col md:items-end space-y-2">
+                        {document.status === "PENDING" && (
+                          <div className="flex flex-col space-y-1" key="pending-actions">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDocumentStatusChange(document.document_id, "APPROVED")}
+                              disabled={approvingDocument === document.document_id || rejectingDocument === document.document_id}
+                              className="text-green-600 hover:text-green-700 hover:border-green-600 h-7 px-3 w-20"
+                            >
+                              {approvingDocument === document.document_id ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                              )}
+                              <span className="text-xs">
+                                {approvingDocument === document.document_id ? "Aprobando..." : "Aprobar"}
+                              </span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDocumentStatusChange(document.document_id, "DISABLED")}
+                              disabled={approvingDocument === document.document_id || rejectingDocument === document.document_id}
+                              className="text-red-600 hover:text-red-700 hover:border-red-600 h-7 px-3 w-20"
+                            >
+                              {rejectingDocument === document.document_id ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <XCircle className="h-3 w-3 mr-1" />
+                              )}
+                              <span className="text-xs">
+                                {rejectingDocument === document.document_id ? "Rechazando..." : "Rechazar"}
+                              </span>
+                            </Button>
+                          </div>
+                        )}
+                        {document.status === "DISABLED" && (
+                          <div className="flex flex-col space-y-1" key="disabled-actions">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDocumentStatusChange(document.document_id, "APPROVED")}
+                              disabled={approvingDocument === document.document_id}
+                              className="text-green-600 hover:text-green-700 hover:border-green-600 h-7 px-3 w-20"
+                            >
+                              {approvingDocument === document.document_id ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                              )}
+                              <span className="text-xs">
+                                {approvingDocument === document.document_id ? "Activando..." : "Activar"}
+                              </span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDocumentDelete(document)}
+                              className="text-red-600 hover:text-red-700 hover:border-red-600 h-7 px-3 w-20"
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              <span className="text-xs">Eliminar</span>
+                            </Button>
+                          </div>
+                        )}
+                        <div className="flex items-center space-x-1">
+                          {document.status !== "DISABLED" && (
+                            <Button
+                              key="edit"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDocumentEdit(document)}
+                              className="h-7 w-7 p-0"
+                              title="Editar documento"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          )}
+                          {document.status === "APPROVED" && (
+                            <Button
+                              key="disable"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDocumentStatusChange(document.document_id, "DISABLED")}
+                              disabled={disablingDocument === document.document_id}
+                              className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                              title="Deshabilitar"
+                            >
+                              {disablingDocument === document.document_id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <XCircle className="h-3 w-3" />
+                              )}
+                            </Button>
+                          )}
+                          {document.status !== "DISABLED" && (
+                            <Button
+                              key="delete"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDocumentDelete(document)}
+                              className="text-destructive hover:text-destructive h-7 w-7 p-0"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {documentsPagination && documentsPagination.total_pages > 1 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Página {documentsPagination.page} de {documentsPagination.total_pages} ({documentsPagination.total_items} elementos total)
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentFilters: DocumentFilters = {
+                        status: statusFilter as "APPROVED" | "DISABLED" | "all",
+                        modality_id: modalityFilter === "all" ? "" : modalityFilter,
+                        submodality_id: submodalityFilter === "all" ? "" : submodalityFilter,
+                        category_id: categoryFilter === "all" ? "" : categoryFilter,
+                        search: searchTerm.trim()
+                      }
+                      goToDocPage(documentsPagination.page - 1, currentFilters)
+                    }}
+                    disabled={!documentsPagination.has_previous || documentsLoading}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentFilters: DocumentFilters = {
+                        status: statusFilter as "PENDING" | "APPROVED" | "DISABLED" | "all",
+                        modality_id: modalityFilter === "all" ? "" : modalityFilter,
+                        submodality_id: submodalityFilter === "all" ? "" : submodalityFilter,
+                        category_id: categoryFilter === "all" ? "" : categoryFilter,
+                        search: searchTerm.trim()
+                      }
+                      goToDocPage(documentsPagination.page + 1, currentFilters)
+                    }}
+                    disabled={!documentsPagination.has_next || documentsLoading}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
         <Dialog open={!!previewingDocument} onOpenChange={handleClosePreview}>
           <DialogContent className="max-w-6xl max-h-[90vh] w-[90vw]">
@@ -1290,6 +1910,240 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <AlertDialog open={isDeleteDocumentDialogOpen} onOpenChange={(open) => {
+          setIsDeleteDocumentDialogOpen(open)
+          if (!open) setDeletingDocument(null)
+        }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. Se eliminará permanentemente el documento "{deletingDocument?.file_name}".
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteDocument} className="bg-destructive hover:bg-destructive/90">
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Edit Document Dialog */}
+        <Dialog open={isEditDocumentDialogOpen} onOpenChange={handleCloseDocumentEdit}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Documento</DialogTitle>
+              <DialogDescription>
+                Modifica los campos que desees actualizar. Los campos no modificados mantendrán sus valores actuales.
+              </DialogDescription>
+            </DialogHeader>
+            {editingDocument && (
+              <div className="space-y-6">
+                {/* Question Text */}
+                <div className="space-y-2">
+                  <Label htmlFor="editDocumentQuestionText" className="text-sm font-medium">
+                    Texto de la Pregunta *
+                  </Label>
+                  <Textarea
+                    id="editDocumentQuestionText"
+                    value={editedDocumentQuestionText}
+                    onChange={(e) => setEditedDocumentQuestionText(e.target.value)}
+                    placeholder="Escribe el texto de la pregunta aquí..."
+                    className="bg-background/50"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Modality */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Modalidad *</Label>
+                  <Select
+                    value={editedDocumentModalityId}
+                    onValueChange={(value) => {
+                      setEditedDocumentModalityId(value)
+                      setEditedDocumentSubmodalityId("") // Reset submodality when modality changes
+                      setEditedDocumentCategoryId("") // Reset category when modality changes
+                    }}
+                  >
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Selecciona una modalidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modalities?.map((modality) => (
+                        <SelectItem key={modality.id} value={modality.id}>
+                          {modality.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Submodality */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Submodalidad</Label>
+                  <Select
+                    value={editedDocumentSubmodalityId}
+                    onValueChange={(value) => {
+                      setEditedDocumentSubmodalityId(value)
+                      setEditedDocumentCategoryId("") // Reset category when submodality changes
+                    }}
+                    disabled={!editedDocumentModalityId || editDocumentSubmodalitiesByModalityLoading}
+                  >
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Selecciona una submodalidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editDocumentSubmodalitiesByModality?.map((submodality) => (
+                        <SelectItem key={submodality.id} value={submodality.id}>
+                          {submodality.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Category */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Categoría</Label>
+                  <Select
+                    value={editedDocumentCategoryId}
+                    onValueChange={setEditedDocumentCategoryId}
+                    disabled={!editedDocumentSubmodalityId || editDocumentCategoriesBySubmodalityLoading}
+                  >
+                    <SelectTrigger className="bg-background/50">
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editDocumentCategoriesBySubmodality?.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* File Upload */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Archivo del Documento</Label>
+                  <div className="space-y-2">
+                    {editedDocumentFiles.length === 0 ? (
+                      <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors hover:border-primary/50 hover:bg-muted/30">
+                        <input
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              const uploadedFile: EditUploadedFile = {
+                                file,
+                                preview: URL.createObjectURL(file),
+                                id: Math.random().toString(36).substr(2, 9)
+                              }
+                              setEditedDocumentFiles([uploadedFile])
+                            }
+                          }}
+                          accept=".pdf,.doc,.docx,.txt"
+                          className="hidden"
+                          id="editDocumentFile"
+                        />
+                        <label htmlFor="editDocumentFile" className="cursor-pointer">
+                          <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            Haz clic para seleccionar un nuevo archivo
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Formatos soportados: PDF, DOC, DOCX, TXT
+                          </p>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Archivo seleccionado:</Label>
+                        {editedDocumentFiles.map((uploadedFile) => (
+                          <div
+                            key={uploadedFile.id}
+                            className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <FileText className="h-6 w-6 text-blue-600" />
+                              <div>
+                                <p className="text-sm font-medium">{uploadedFile.file.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                URL.revokeObjectURL(uploadedFile.preview)
+                                setEditedDocumentFiles([])
+                              }}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Si no subes un archivo nuevo, se mantendrá el archivo actual "{editingDocument.file_name}".
+                  </p>
+                </div>
+
+                {/* Current Document Info */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Información del Documento Actual</Label>
+                  <div className="p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <p className="text-sm font-medium">{editingDocument.file_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Tipo: {editingDocument.file_type} | Creado: {new Date(editingDocument.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={handleCloseDocumentEdit}
+                disabled={isSavingDocument}
+                className="hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSaveDocumentEdit}
+                disabled={isSavingDocument}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isSavingDocument ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar Cambios
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   )
