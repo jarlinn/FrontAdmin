@@ -170,3 +170,47 @@ export function useCategoriesBySubmodality(submodalityId: string | null) {
     refreshCategoriesBySubmodality
   }
 }
+
+export function useCategoriesByModality(modalityId: string | null) {
+  const [categories, setCategories] = useState<NewCategory[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchCategoriesByModality = useCallback(async (id: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await newCategoryService.getCategoriesByModality(id)
+      setCategories(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar categorías')
+      console.error('Error fetching categories by modality:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (modalityId) {
+      fetchCategoriesByModality(modalityId)
+    } else {
+      setCategories([])
+      setLoading(false)
+      setError(null)
+    }
+  }, [modalityId, fetchCategoriesByModality])
+
+  const refreshCategoriesByModality = useCallback(() => {
+    if (modalityId) {
+      fetchCategoriesByModality(modalityId)
+    }
+  }, [modalityId, fetchCategoriesByModality])
+
+  return {
+    categories,
+    loading,
+    error,
+    refreshCategoriesByModality
+  }
+}
+

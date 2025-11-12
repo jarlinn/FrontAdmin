@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useAuthFetch } from "./use-auth-fetch"
 import { buildApiUrl, API_CONFIG } from "@/lib/api-config"
 import { Document, DocumentFilters, DocumentsResponse, UpdateDocumentStatusRequest } from "@/lib/documents"
+import { authService } from "@/lib/auth"
 
 export function useDocuments() {
   const [documents, setDocuments] = useState<Document[]>([])
@@ -16,36 +17,46 @@ export function useDocuments() {
     setLoading(true)
     setError(null)
 
+    const queryParams = new URLSearchParams()
+
+    // Agregar filtros a los parámetros de consulta
+    if (filters.status && filters.status !== "all") {
+      queryParams.append("status", filters.status)
+    }
+    if (filters.modality_id) {
+      queryParams.append("modality_id", filters.modality_id)
+    }
+    if (filters.submodality_id) {
+      queryParams.append("submodality_id", filters.submodality_id)
+    }
+    if (filters.category_id) {
+      queryParams.append("category_id", filters.category_id)
+    }
+    if (filters.search) {
+      queryParams.append("search", filters.search)
+    }
+
+    queryParams.append("page", page.toString())
+    queryParams.append("page_size", "10")
+
+    const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.DOCUMENTS)}?${queryParams.toString()}`
+
     try {
-      const queryParams = new URLSearchParams()
+      const response = await authService.authenticatedFetch(url)
 
-      // Agregar filtros a los parámetros de consulta
-      if (filters.status && filters.status !== "all") {
-        queryParams.append("status", filters.status)
-      }
-      if (filters.modality_id) {
-        queryParams.append("modality_id", filters.modality_id)
-      }
-      if (filters.submodality_id) {
-        queryParams.append("submodality_id", filters.submodality_id)
-      }
-      if (filters.category_id) {
-        queryParams.append("category_id", filters.category_id)
-      }
-      if (filters.search) {
-        queryParams.append("search", filters.search)
-      }
-
-      queryParams.append("page", page.toString())
-      queryParams.append("page_size", "10")
-
-      const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.DOCUMENTS)}?${queryParams.toString()}`
-
-      const response = await fetchData(url)
-
-      if (response) {
-        setDocuments(response.items || [])
-        setPagination(response.pagination || null)
+      if (!response.ok) {
+        if (response.status === 404) {
+          setDocuments([])
+          setPagination(null)
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage = errorData.detail || errorData.message || `Error ${response.status}: ${response.statusText}`
+          setError(errorMessage)
+        }
+      } else {
+        const responseData = await response.json()
+        setDocuments(responseData.items || [])
+        setPagination(responseData.pagination || null)
       }
     } catch (err) {
       console.error("Error fetching documents:", err)
@@ -53,7 +64,7 @@ export function useDocuments() {
     } finally {
       setLoading(false)
     }
-  }, [fetchData])
+  }, [])
 
   const updateDocumentStatus = useCallback(async (documentId: string, action: "approve" | "disable"): Promise<any> => {
     try {
