@@ -60,7 +60,7 @@ import { useDocuments } from "@/hooks/use-documents"
 import { Document, DocumentFilters } from "@/lib/documents"
 import { useModalities } from "@/hooks/use-modalities"
 import { useSubmodalities, useSubmodalitiesByModality } from "@/hooks/use-submodalities"
-import { useNewCategories, useCategoriesBySubmodality } from "@/hooks/use-new-categories"
+import { useNewCategories, useCategoriesBySubmodality, useCategoriesByModality } from "@/hooks/use-new-categories"
 import { Modality } from "@/lib/modalities"
 import { NewCategory } from "@/lib/new-categories"
 import { authService } from "@/lib/auth"
@@ -102,10 +102,33 @@ export default function ValidationPage() {
   }, [questions])
   const { modalities, loading: modalitiesLoading } = useModalities()
   const { submodalities: submodalitiesByModality, loading: submodalitiesByModalityLoading } = useSubmodalitiesByModality(modalityFilter !== "all" ? modalityFilter : "")
+  const { newCategories: allCategories, loading: allCategoriesLoading } = useNewCategories()
   const { categories: categoriesBySubmodality, loading: categoriesBySubmodalityLoading } = useCategoriesBySubmodality(submodalityFilter !== "all" ? submodalityFilter : "")
-  
+  const { categories: categoriesByModality, loading: categoriesByModalityLoading } = useCategoriesByModality(modalityFilter !== "all" ? modalityFilter : "")
+
 // Estados para selector de categorías
 const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false)
+
+// Combined categories for filtering based on current filter selection
+const allAvailableCategories = useMemo(() => {
+  // If a specific submodality is selected, show only categories under that submodality
+  if (submodalityFilter !== "all" && categoriesBySubmodality) {
+    return categoriesBySubmodality
+  }
+
+  // If a specific modality is selected but no submodality, show all categories under that modality
+  if (modalityFilter !== "all" && categoriesByModality) {
+    return categoriesByModality
+  }
+
+  // If everything is "all", show all categories
+  if (modalityFilter === "all" && submodalityFilter === "all" && allCategories) {
+    return allCategories
+  }
+
+  // Default: empty array
+  return []
+}, [modalityFilter, submodalityFilter, categoriesByModality, categoriesBySubmodality, allCategories])
 
 const [editingItem, setEditingItem] = useState<Question | null>(null)
   const [deletingItem, setDeletingItem] = useState<Question | null>(null)
@@ -152,11 +175,55 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
 
   // Hooks para edición jerárquica
   const { submodalities: editSubmodalitiesByModality, loading: editSubmodalitiesByModalityLoading } = useSubmodalitiesByModality(editedModalityId || "")
-  const { categories: editCategoriesBySubmodality, loading: editCategoriesBySubmodalityLoading } = useCategoriesBySubmodality(editedSubmodalityId || "")
+  const { categories: editCategoriesBySubmodality, loading: editCategoriesBySubmodalityLoading } = useCategoriesBySubmodality(editedSubmodalityId && editedSubmodalityId !== "none" ? editedSubmodalityId : null)
+  const { categories: editCategoriesByModality, loading: editCategoriesByModalityLoading } = useCategoriesByModality(editedModalityId || "")
+
+  // Combined categories for editing (same logic as content creation)
+  const editAllAvailableCategories = useMemo(() => {
+    // If a specific submodality is selected, only show categories under that submodality
+    if (editedSubmodalityId && editedSubmodalityId !== "none" && editCategoriesBySubmodality) {
+      return editCategoriesBySubmodality
+    }
+
+    // If "Ninguna" is selected for submodality, show only categories directly under the modality
+    if (editedSubmodalityId === "none" && editCategoriesByModality) {
+      return editCategoriesByModality.filter(category => !category.submodality_id)
+    }
+
+    // If modality is selected but no submodality choice made yet, show all categories under that modality
+    if (editedModalityId && editCategoriesByModality) {
+      return editCategoriesByModality
+    }
+
+    // If nothing is selected, return empty array
+    return []
+  }, [editedModalityId, editedSubmodalityId, editCategoriesByModality, editCategoriesBySubmodality])
 
   // Hooks para edición jerárquica de documentos
   const { submodalities: editDocumentSubmodalitiesByModality, loading: editDocumentSubmodalitiesByModalityLoading } = useSubmodalitiesByModality(editedDocumentModalityId || "")
   const { categories: editDocumentCategoriesBySubmodality, loading: editDocumentCategoriesBySubmodalityLoading } = useCategoriesBySubmodality(editedDocumentSubmodalityId || "")
+  const { categories: editDocumentCategoriesByModality, loading: editDocumentCategoriesByModalityLoading } = useCategoriesByModality(editedDocumentModalityId || "")
+
+  // Combined categories for document editing
+  const editDocumentAllAvailableCategories = useMemo(() => {
+    // If a specific submodality is selected, only show categories under that submodality
+    if (editedDocumentSubmodalityId && editedDocumentSubmodalityId !== "" && editDocumentCategoriesBySubmodality) {
+      return editDocumentCategoriesBySubmodality
+    }
+
+    // If "Ninguna" is selected for submodality, show only categories directly under the modality
+    if (editedDocumentSubmodalityId === "" && editDocumentCategoriesByModality) {
+      return editDocumentCategoriesByModality.filter(category => !category.submodality_id)
+    }
+
+    // If modality is selected but no submodality choice made yet, show all categories under that modality
+    if (editedDocumentModalityId && editDocumentCategoriesByModality) {
+      return editDocumentCategoriesByModality
+    }
+
+    // If nothing is selected, return empty array
+    return []
+  }, [editedDocumentModalityId, editedDocumentSubmodalityId, editDocumentCategoriesByModality, editDocumentCategoriesBySubmodality])
 
   // Función para detectar si el contenido está truncado
   const checkIfTruncated = (element: HTMLElement) => {
@@ -317,7 +384,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
     setEditedContextText(question.context_text || "")
     setEditedContextType(question.context_type)
     setEditedModalityId(question.modality_id || "")
-    setEditedSubmodalityId(question.submodality_id || "")
+    setEditedSubmodalityId(question.submodality_id || "none")
     setEditedCategoryId(question.category_id)
 
     // Limpiar archivos subidos
@@ -341,7 +408,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
       if (editedModalityId) {
         formData.append('modality_id', editedModalityId)
       }
-      if (editedSubmodalityId) {
+      if (editedSubmodalityId && editedSubmodalityId !== "none") {
         formData.append('submodality_id', editedSubmodalityId)
       }
 
@@ -581,7 +648,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
       const formData = new FormData()
       formData.append('question_text', editedDocumentQuestionText)
       formData.append('modality_id', editedDocumentModalityId)
-      if (editedDocumentSubmodalityId) {
+      if (editedDocumentSubmodalityId && editedDocumentSubmodalityId !== "") {
         formData.append('submodality_id', editedDocumentSubmodalityId)
       }
       if (editedDocumentCategoryId) {
@@ -792,16 +859,16 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                   <Select
                     value={categoryFilter}
                     onValueChange={setCategoryFilter}
-                    disabled={categoriesBySubmodalityLoading || submodalityFilter === "all"}
+                    disabled={allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading}
                   >
                     <SelectTrigger className="bg-background/50 h-10 focus:ring-red-300 focus:ring-2">
-                      <SelectValue placeholder={categoriesBySubmodalityLoading ? "Cargando categorías..." : "Todas las categorías"} />
+                      <SelectValue placeholder={(allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading) ? "Cargando categorías..." : "Todas las categorías"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all" className="focus:bg-red-50 focus:text-red-900">
                         Todas las categorías
                       </SelectItem>
-                      {categoriesBySubmodality?.map((category) => (
+                      {allAvailableCategories?.map((category) => (
                         <SelectItem key={category.id} value={category.id} className="focus:bg-red-50 focus:text-red-900">
                           {category.name}
                         </SelectItem>
@@ -811,7 +878,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm">Resultados</Label>
+                  <Label className="text-sm">Preguntas</Label>
                   <div className="flex items-center h-10 px-3 bg-muted/30 rounded-md">
                     <span className="text-sm text-muted-foreground">
                       {pagination ? `${pagination.total_items} elementos` : `${questions.length} elementos`}
@@ -1253,16 +1320,16 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                       <Select
                         value={categoryFilter}
                         onValueChange={setCategoryFilter}
-                        disabled={categoriesBySubmodalityLoading || submodalityFilter === "all"}
+                        disabled={allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading}
                       >
                         <SelectTrigger className="bg-background/50 h-10 focus:ring-blue-300 focus:ring-2">
-                          <SelectValue placeholder={categoriesBySubmodalityLoading ? "Cargando categorías..." : "Todas las categorías"} />
+                          <SelectValue placeholder={(allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading) ? "Cargando categorías..." : "Todas las categorías"} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all" className="focus:bg-blue-50 focus:text-blue-900">
                             Todas las categorías
                           </SelectItem>
-                          {categoriesBySubmodality?.map((category) => (
+                          {allAvailableCategories?.map((category) => (
                             <SelectItem key={category.id} value={category.id} className="focus:bg-blue-50 focus:text-blue-900">
                               {category.name}
                             </SelectItem>
@@ -1272,7 +1339,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm">Resultados</Label>
+                      <Label className="text-sm">Documentos</Label>
                       <div className="flex items-center h-10 px-3 bg-muted/30 rounded-md">
                         <span className="text-sm text-muted-foreground">
                           {documentsPagination ? `${documentsPagination.total_items} elementos` : `${documents.length} elementos`}
@@ -1673,17 +1740,20 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Submodalidad</Label>
                   <Select
-                    value={editedSubmodalityId}
+                    value={editedSubmodalityId === "none" ? "none" : (editedSubmodalityId || "none")}
                     onValueChange={(value) => {
-                      setEditedSubmodalityId(value)
+                      setEditedSubmodalityId(value === "none" ? "none" : value)
                       setEditedCategoryId("") // Reset category when submodality changes
                     }}
                     disabled={!editedModalityId || editSubmodalitiesByModalityLoading}
                   >
                     <SelectTrigger className="bg-background/50">
-                      <SelectValue placeholder="Selecciona una submodalidad" />
+                      <SelectValue placeholder="Selecciona una submodalidad (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">
+                        Ninguna (directo bajo modalidad)
+                      </SelectItem>
                       {editSubmodalitiesByModality?.map((submodality) => (
                         <SelectItem key={submodality.id} value={submodality.id}>
                           {submodality.name}
@@ -1699,13 +1769,13 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                   <Select
                     value={editedCategoryId}
                     onValueChange={setEditedCategoryId}
-                    disabled={!editedSubmodalityId || editCategoriesBySubmodalityLoading}
+                    disabled={!editedModalityId}
                   >
                     <SelectTrigger className="bg-background/50">
                       <SelectValue placeholder="Selecciona una categoría" />
                     </SelectTrigger>
                     <SelectContent>
-                      {editCategoriesBySubmodality?.map((category) => (
+                      {editAllAvailableCategories?.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
                         </SelectItem>
@@ -1985,17 +2055,20 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Submodalidad</Label>
                   <Select
-                    value={editedDocumentSubmodalityId}
+                    value={editedDocumentSubmodalityId === "" ? "none" : (editedDocumentSubmodalityId || "none")}
                     onValueChange={(value) => {
-                      setEditedDocumentSubmodalityId(value)
+                      setEditedDocumentSubmodalityId(value === "none" ? "" : value)
                       setEditedDocumentCategoryId("") // Reset category when submodality changes
                     }}
                     disabled={!editedDocumentModalityId || editDocumentSubmodalitiesByModalityLoading}
                   >
                     <SelectTrigger className="bg-background/50">
-                      <SelectValue placeholder="Selecciona una submodalidad" />
+                      <SelectValue placeholder="Selecciona una submodalidad (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">
+                        Ninguna (directo bajo modalidad)
+                      </SelectItem>
                       {editDocumentSubmodalitiesByModality?.map((submodality) => (
                         <SelectItem key={submodality.id} value={submodality.id}>
                           {submodality.name}
@@ -2011,13 +2084,13 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                   <Select
                     value={editedDocumentCategoryId}
                     onValueChange={setEditedDocumentCategoryId}
-                    disabled={!editedDocumentSubmodalityId || editDocumentCategoriesBySubmodalityLoading}
+                    disabled={!editedDocumentModalityId}
                   >
                     <SelectTrigger className="bg-background/50">
                       <SelectValue placeholder="Selecciona una categoría" />
                     </SelectTrigger>
                     <SelectContent>
-                      {editDocumentCategoriesBySubmodality?.map((category) => (
+                      {editDocumentAllAvailableCategories?.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
                         </SelectItem>

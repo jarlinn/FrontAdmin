@@ -8,10 +8,11 @@ export interface NewCategory {
   name: string
   slug: string
   description: string
-  submodality_id: string
+  submodality_id?: string
+  modality_id?: string
   created_at: string
   updated_at: string | null
-  submodality_name: string
+  submodality_name?: string
   modality_name: string
   full_name: string
   full_path: string
@@ -21,13 +22,15 @@ export interface NewCategory {
 export interface CreateNewCategoryRequest {
   name: string
   description?: string
-  submodality_id: string
+  submodality_id?: string | null
+  modality_id?: string | null
 }
 
 export interface UpdateNewCategoryRequest {
   name?: string
   description?: string
-  submodality_id?: string
+  submodality_id?: string | null
+  modality_id?: string | null
 }
 
 class NewCategoryService {
@@ -92,7 +95,8 @@ class NewCategoryService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(categoryData),
-        }
+        },
+        API_CONFIG.TIMEOUT // Use standard timeout for category creation
       )
 
       if (!response.ok) {
@@ -200,28 +204,52 @@ class NewCategoryService {
   }
 
   /**
-   * Obtener categorías filtradas por submodalidad
-   */
-  async getCategoriesBySubmodality(submodalityId: string): Promise<NewCategory[]> {
-    try {
-      const response = await authService.authenticatedFetch(
-        `${API_CONFIG.BASE_URL}/chat/categories/?submodality_id=${submodalityId}`
-      )
+    * Obtener categorías filtradas por submodalidad
+    */
+   async getCategoriesBySubmodality(submodalityId: string): Promise<NewCategory[]> {
+     try {
+       const response = await authService.authenticatedFetch(
+         `${API_CONFIG.BASE_URL}/chat/categories/?submodality_id=${submodalityId}`
+       )
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Error al obtener categorías')
-      }
+       if (!response.ok) {
+         const errorData = await response.json()
+         throw new Error(errorData.detail || 'Error al obtener categorías')
+       }
 
-      const categories: NewCategory[] = await response.json()
-      return categories
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error
-      }
-      throw new Error('Error de conexión al servidor')
-    }
-  }
+       const categories: NewCategory[] = await response.json()
+       return categories
+     } catch (error) {
+       if (error instanceof Error) {
+         throw error
+       }
+       throw new Error('Error de conexión al servidor')
+     }
+   }
+
+   /**
+    * Obtener categorías filtradas por modalidad
+    */
+   async getCategoriesByModality(modalityId: string): Promise<NewCategory[]> {
+     try {
+       const response = await authService.authenticatedFetch(
+         `${API_CONFIG.BASE_URL}/chat/categories/?modality_id=${modalityId}`
+       )
+
+       if (!response.ok) {
+         const errorData = await response.json()
+         throw new Error(errorData.detail || 'Error al obtener categorías')
+       }
+
+       const categories: NewCategory[] = await response.json()
+       return categories
+     } catch (error) {
+       if (error instanceof Error) {
+         throw error
+       }
+       throw new Error('Error de conexión al servidor')
+     }
+   }
 }
 
 // Exportar instancia singleton

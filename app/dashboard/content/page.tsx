@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,7 +21,7 @@ import { useAuthFetch } from "@/hooks/use-auth-fetch"
 import { useQuestions } from "@/hooks/use-questions"
 import { useModalities } from "@/hooks/use-modalities"
 import { useSubmodalities, useSubmodalitiesByModality } from "@/hooks/use-submodalities"
-import { useNewCategories, useCategoriesBySubmodality } from "@/hooks/use-new-categories"
+import { useNewCategories, useCategoriesBySubmodality, useCategoriesByModality } from "@/hooks/use-new-categories"
 import { Modality, Submodality } from "@/lib/modalities"
 import { NewCategory } from "@/lib/new-categories"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -79,6 +79,8 @@ export default function ContentPage() {
   const [newCategoryHierName, setNewCategoryHierName] = useState("")
   const [newCategoryHierDescription, setNewCategoryHierDescription] = useState("")
   const [newCategorySubmodalityId, setNewCategorySubmodalityId] = useState("")
+  const [newCategoryModalityId, setNewCategoryModalityId] = useState("")
+  const [newCategoryParentType, setNewCategoryParentType] = useState<"modality" | "submodality">("submodality")
   const [editingNewCategory, setEditingNewCategory] = useState<NewCategory | null>(null)
   const [isSubmittingNewCategory, setIsSubmittingNewCategory] = useState(false)
 
@@ -127,11 +129,37 @@ export default function ContentPage() {
   const {
     categories: categoriesBySubmodality,
     loading: categoriesBySubmodalityLoading
-  } = useCategoriesBySubmodality(selectedSubmodalityId)
+  } = useCategoriesBySubmodality(selectedSubmodalityId !== "none" ? selectedSubmodalityId : null)
+
+  const {
+    categories: categoriesByModality,
+    loading: categoriesByModalityLoading
+  } = useCategoriesByModality(selectedModalityId)
+
+  // Combined categories for selection with proper filtering logic
+  const allAvailableCategories = useMemo(() => {
+    // If a specific submodality is selected, only show categories under that submodality
+    if (selectedSubmodalityId && selectedSubmodalityId !== "none" && categoriesBySubmodality) {
+      return categoriesBySubmodality
+    }
+
+    // If "Ninguna" is selected for submodality, show only categories directly under the modality
+    if (selectedSubmodalityId === "none" && categoriesByModality) {
+      return categoriesByModality.filter(category => !category.submodality_id)
+    }
+
+    // If modality is selected but no submodality choice made yet, show all categories under that modality
+    if (selectedModalityId && categoriesByModality) {
+      return categoriesByModality
+    }
+
+    // If nothing is selected, return empty array
+    return []
+  }, [selectedModalityId, selectedSubmodalityId, categoriesByModality, categoriesBySubmodality])
 
   // Clear dependent selections when parent changes
   useEffect(() => {
-    setSelectedSubmodalityId("")
+    setSelectedSubmodalityId("none")
     setSelectedCategoryId("")
   }, [selectedModalityId])
 
@@ -334,19 +362,34 @@ export default function ContentPage() {
 
   // Funciones para manejar categorías nuevas
   const handleCreateNewCategory = async () => {
-    if (!newCategoryHierName.trim() || !newCategorySubmodalityId) return
+    if (!newCategoryHierName.trim()) return
+
+    // Validate that exactly one parent is selected
+    if (newCategoryParentType === "submodality" && !newCategorySubmodalityId) {
+      setErrorMessage('Debes seleccionar una submodalidad')
+      setShowErrorDialog(true)
+      return
+    }
+    if (newCategoryParentType === "modality" && !newCategoryModalityId) {
+      setErrorMessage('Debes seleccionar una modalidad')
+      setShowErrorDialog(true)
+      return
+    }
 
     setIsSubmittingNewCategory(true)
     const result = await createNewCategory({
       name: newCategoryHierName,
       description: newCategoryHierDescription || undefined,
-      submodality_id: newCategorySubmodalityId
+      submodality_id: newCategoryParentType === "submodality" ? newCategorySubmodalityId : null,
+      modality_id: newCategoryParentType === "modality" ? newCategoryModalityId : null
     })
 
     if (result.success) {
       setNewCategoryHierName("")
       setNewCategoryHierDescription("")
       setNewCategorySubmodalityId("")
+      setNewCategoryModalityId("")
+      setNewCategoryParentType("submodality")
       setIsCreateNewCategoryOpen(false)
 
       console.log("Categoría creada exitosamente")
@@ -366,17 +409,32 @@ export default function ContentPage() {
   const handleEditNewCategory = async () => {
     if (!editingNewCategory || !newCategoryHierName.trim()) return
 
+    // Validate that exactly one parent is selected
+    if (newCategoryParentType === "submodality" && !newCategorySubmodalityId) {
+      setErrorMessage('Debes seleccionar una submodalidad')
+      setShowErrorDialog(true)
+      return
+    }
+    if (newCategoryParentType === "modality" && !newCategoryModalityId) {
+      setErrorMessage('Debes seleccionar una modalidad')
+      setShowErrorDialog(true)
+      return
+    }
+
     setIsSubmittingNewCategory(true)
     const result = await updateNewCategory(editingNewCategory.id, {
       name: newCategoryHierName,
       description: newCategoryHierDescription || undefined,
-      submodality_id: newCategorySubmodalityId || editingNewCategory.submodality_id
+      submodality_id: newCategoryParentType === "submodality" ? newCategorySubmodalityId : null,
+      modality_id: newCategoryParentType === "modality" ? newCategoryModalityId : null
     })
 
     if (result.success) {
       setNewCategoryHierName("")
       setNewCategoryHierDescription("")
       setNewCategorySubmodalityId("")
+      setNewCategoryModalityId("")
+      setNewCategoryParentType("submodality")
       setEditingNewCategory(null)
       setIsEditNewCategoryOpen(false)
 
@@ -430,7 +488,9 @@ export default function ContentPage() {
     setEditingNewCategory(category)
     setNewCategoryHierName(category.name)
     setNewCategoryHierDescription(category.description || "")
-    setNewCategorySubmodalityId(category.submodality_id)
+    setNewCategoryParentType(category.submodality_id ? "submodality" : "modality")
+    setNewCategorySubmodalityId(category.submodality_id || "")
+    setNewCategoryModalityId(category.modality_id || "")
     setIsEditNewCategoryOpen(true)
   }
 
@@ -528,7 +588,7 @@ export default function ContentPage() {
       formData.append('context_type', contextType)
       
       formData.append('modality_id', selectedModalityId)
-      if (selectedSubmodalityId) {
+      if (selectedSubmodalityId && selectedSubmodalityId !== "none") {
         formData.append('submodality_id', selectedSubmodalityId)
       }
       if (selectedCategoryId) {
@@ -652,7 +712,7 @@ export default function ContentPage() {
       formData.append('question_text', question)
       formData.append('file', uploadedFiles[0].file)
       formData.append('modality_id', selectedModalityId)
-      if (selectedSubmodalityId) {
+      if (selectedSubmodalityId && selectedSubmodalityId !== "none") {
         formData.append('submodality_id', selectedSubmodalityId)
       }
       if (selectedCategoryId) {
@@ -911,14 +971,17 @@ export default function ContentPage() {
                         <Label>Submodalidad (Opcional)</Label>
                         <div className="flex gap-2">
                           <Select
-                            value={selectedSubmodalityId}
-                            onValueChange={setSelectedSubmodalityId}
+                            value={selectedSubmodalityId || "none"}
+                            onValueChange={(value) => setSelectedSubmodalityId(value === "none" ? "" : value)}
                             disabled={!selectedModalityId}
                           >
                             <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
-                              <SelectValue placeholder="Selecciona submodalidad" />
+                              <SelectValue placeholder="Selecciona submodalidad (opcional)" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="none">
+                                Ninguna (directo bajo modalidad)
+                              </SelectItem>
                               {submodalitiesByModality?.map((submodality) => (
                                 <SelectItem key={submodality.id} value={submodality.id}>
                                   {submodality.name}
@@ -947,13 +1010,13 @@ export default function ContentPage() {
                           <Select
                             value={selectedCategoryId}
                             onValueChange={setSelectedCategoryId}
-                            disabled={!selectedSubmodalityId}
+                            disabled={!selectedModalityId}
                           >
                             <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
                               <SelectValue placeholder="Selecciona categoría" />
                             </SelectTrigger>
                             <SelectContent>
-                              {categoriesBySubmodality?.map((category) => (
+                              {allAvailableCategories?.map((category) => (
                                 <SelectItem key={category.id} value={category.id}>
                                   {category.name}
                                 </SelectItem>
@@ -1153,8 +1216,8 @@ export default function ContentPage() {
                         <div>
                           <Label className="text-xs text-muted-foreground">CATEGORÍA</Label>
                           <p className="text-sm font-medium">
-                            {selectedCategoryId 
-                              ? categoriesBySubmodality?.find(c => c.id === selectedCategoryId)?.name || "No especificada"
+                            {selectedCategoryId
+                              ? allAvailableCategories?.find(c => c.id === selectedCategoryId)?.name || "No especificada"
                               : "No especificada"
                             }
                           </p>
@@ -1367,14 +1430,17 @@ export default function ContentPage() {
                         <Label>Submodalidad (Opcional)</Label>
                         <div className="flex gap-2">
                           <Select
-                            value={selectedSubmodalityId}
-                            onValueChange={setSelectedSubmodalityId}
+                            value={selectedSubmodalityId === "none" ? "none" : (selectedSubmodalityId || "none")}
+                            onValueChange={(value) => setSelectedSubmodalityId(value === "none" ? "none" : value)}
                             disabled={!selectedModalityId}
                           >
                             <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
-                              <SelectValue placeholder="Selecciona submodalidad" />
+                              <SelectValue placeholder="Selecciona submodalidad (opcional)" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="none">
+                                Ninguna (directo bajo modalidad)
+                              </SelectItem>
                               {submodalitiesByModality?.map((submodality) => (
                                 <SelectItem key={submodality.id} value={submodality.id}>
                                   {submodality.name}
@@ -1403,13 +1469,13 @@ export default function ContentPage() {
                           <Select
                             value={selectedCategoryId}
                             onValueChange={setSelectedCategoryId}
-                            disabled={!selectedSubmodalityId}
+                            disabled={!selectedModalityId}
                           >
                             <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
                               <SelectValue placeholder="Selecciona categoría" />
                             </SelectTrigger>
                             <SelectContent>
-                              {categoriesBySubmodality?.map((category) => (
+                              {allAvailableCategories?.map((category) => (
                                 <SelectItem key={category.id} value={category.id}>
                                   {category.name}
                                 </SelectItem>
@@ -1780,10 +1846,12 @@ export default function ContentPage() {
                               <span className="text-sm font-medium text-muted-foreground">Modalidad:</span>
                               <p className="text-sm text-blue-600 font-medium mt-1">{category.modality_name}</p>
                             </div>
-                            <div>
-                              <span className="text-sm font-medium text-muted-foreground">Submodalidad:</span>
-                              <p className="text-sm text-green-600 font-medium mt-1">{category.submodality_name}</p>
-                            </div>
+                            {category.submodality_name && (
+                              <div>
+                                <span className="text-sm font-medium text-muted-foreground">Submodalidad:</span>
+                                <p className="text-sm text-green-600 font-medium mt-1">{category.submodality_name}</p>
+                              </div>
+                            )}
                             <div>
                               <span className="text-sm font-medium text-muted-foreground">Categoría:</span>
                               <h4 className="font-semibold text-base mt-1">{category.name}</h4>
@@ -2105,21 +2173,78 @@ export default function ContentPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Parent Type Selection */}
               <div>
-                <Label htmlFor="categorySubmodality" className="text-black">Submodalidad Padre *</Label>
-                <Select value={newCategorySubmodalityId} onValueChange={setNewCategorySubmodalityId}>
-                  <SelectTrigger className="border-red-200 focus:border-red-400">
-                    <SelectValue placeholder="Selecciona submodalidad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {submodalities?.map((submodality) => (
-                      <SelectItem key={submodality.id} value={submodality.id}>
-                        {submodality.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-black">¿Dónde crear la categoría?</Label>
+                <div className="flex gap-6 mt-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="parentType"
+                      value="modality"
+                      checked={newCategoryParentType === "modality"}
+                      onChange={(e) => {
+                        setNewCategoryParentType(e.target.value as "modality")
+                        setNewCategorySubmodalityId("")
+                      }}
+                      className="text-red-600"
+                    />
+                    <span className="text-sm">Directo bajo Modalidad</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="parentType"
+                      value="submodality"
+                      checked={newCategoryParentType === "submodality"}
+                      onChange={(e) => {
+                        setNewCategoryParentType(e.target.value as "submodality")
+                        setNewCategoryModalityId("")
+                      }}
+                      className="text-red-600"
+                    />
+                    <span className="text-sm">Bajo Submodalidad</span>
+                  </label>
+                </div>
               </div>
+
+              {/* Parent Selection */}
+              {newCategoryParentType === "modality" && (
+                <div>
+                  <Label htmlFor="categoryModality" className="text-black">Modalidad Padre *</Label>
+                  <Select value={newCategoryModalityId} onValueChange={setNewCategoryModalityId}>
+                    <SelectTrigger className="border-red-200 focus:border-red-400">
+                      <SelectValue placeholder="Selecciona modalidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modalities?.map((modality) => (
+                        <SelectItem key={modality.id} value={modality.id}>
+                          {modality.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {newCategoryParentType === "submodality" && (
+                <div>
+                  <Label htmlFor="categorySubmodality" className="text-black">Submodalidad Padre *</Label>
+                  <Select value={newCategorySubmodalityId} onValueChange={setNewCategorySubmodalityId}>
+                    <SelectTrigger className="border-red-200 focus:border-red-400">
+                      <SelectValue placeholder="Selecciona submodalidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {submodalities?.map((submodality) => (
+                        <SelectItem key={submodality.id} value={submodality.id}>
+                          {submodality.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="categoryName" className="text-black">Nombre *</Label>
                 <Input
@@ -2178,21 +2303,82 @@ export default function ContentPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Parent Type Selection */}
               <div>
-                <Label htmlFor="editCategorySubmodality" className="text-black">Submodalidad Padre *</Label>
-                <Select value={newCategorySubmodalityId} onValueChange={setNewCategorySubmodalityId}>
-                  <SelectTrigger className="border-red-200 focus:border-red-400">
-                    <SelectValue placeholder="Selecciona submodalidad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {submodalities?.map((submodality) => (
-                      <SelectItem key={submodality.id} value={submodality.id}>
-                        {submodality.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-black">¿Dónde ubicar la categoría?</Label>
+                <div className="flex gap-6 mt-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="editParentType"
+                      value="modality"
+                      checked={newCategoryParentType === "modality"}
+                      onChange={(e) => {
+                        setNewCategoryParentType(e.target.value as "modality")
+                        setNewCategorySubmodalityId("")
+                        // If modality is not set but we have editing category with modality_id, set it
+                        if (!newCategoryModalityId && editingNewCategory?.modality_id) {
+                          setNewCategoryModalityId(editingNewCategory.modality_id)
+                        }
+                      }}
+                      className="text-red-600"
+                    />
+                    <span className="text-sm">Directo bajo Modalidad</span>
+                  </label>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      name="editParentType"
+                      value="submodality"
+                      checked={newCategoryParentType === "submodality"}
+                      onChange={(e) => {
+                        setNewCategoryParentType(e.target.value as "submodality")
+                        setNewCategoryModalityId("")
+                      }}
+                      className="text-red-600"
+                    />
+                    <span className="text-sm">Bajo Submodalidad</span>
+                  </label>
+                </div>
               </div>
+
+              {/* Parent Selection */}
+              {newCategoryParentType === "modality" && (
+                <div>
+                  <Label htmlFor="editCategoryModality" className="text-black">Modalidad Padre *</Label>
+                  <Select value={newCategoryModalityId} onValueChange={setNewCategoryModalityId}>
+                    <SelectTrigger className="border-red-200 focus:border-red-400">
+                      <SelectValue placeholder="Selecciona modalidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modalities?.map((modality) => (
+                        <SelectItem key={modality.id} value={modality.id}>
+                          {modality.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {newCategoryParentType === "submodality" && (
+                <div>
+                  <Label htmlFor="editCategorySubmodality" className="text-black">Submodalidad Padre *</Label>
+                  <Select value={newCategorySubmodalityId} onValueChange={setNewCategorySubmodalityId}>
+                    <SelectTrigger className="border-red-200 focus:border-red-400">
+                      <SelectValue placeholder="Selecciona submodalidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {submodalities?.map((submodality) => (
+                        <SelectItem key={submodality.id} value={submodality.id}>
+                          {submodality.full_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor="editCategoryName" className="text-black">Nombre *</Label>
                 <Input
