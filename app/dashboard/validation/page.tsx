@@ -66,7 +66,14 @@ import { NewCategory } from "@/lib/new-categories"
 import { authService } from "@/lib/auth"
 import { buildApiUrl } from "@/lib/api-config"
 
-const statusOptions = [
+const questionStatusOptions = [
+  { value: "all", label: "Todos los estados" },
+  { value: "PENDING", label: "Pendiente" },
+  { value: "APPROVED", label: "Aprobado" },
+  { value: "DISABLED", label: "Rechazado" },
+]
+
+const documentStatusOptions = [
   { value: "all", label: "Todos los estados" },
   { value: "APPROVED", label: "Aprobado" },
   { value: "DISABLED", label: "Rechazado" },
@@ -803,7 +810,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {statusOptions.map((option) => (
+                      {questionStatusOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value} className="focus:bg-red-50 focus:text-red-900">
                           {option.label}
                         </SelectItem>
@@ -1263,7 +1270,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {statusOptions.map((option) => (
+                          {documentStatusOptions.map((option) => (
                             <SelectItem key={option.value} value={option.value} className="focus:bg-blue-50 focus:text-blue-900">
                               {option.label}
                             </SelectItem>
@@ -1627,7 +1634,13 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                         category_id: categoryFilter === "all" ? "" : categoryFilter,
                         search: searchTerm.trim()
                       }
-                      goToDocPage(documentsPagination.page + 1, currentFilters)
+                      goToDocPage(documentsPagination.page + 1, {
+                        status: statusFilter as "APPROVED" | "DISABLED" | "all",
+                        modality_id: modalityFilter === "all" ? "" : modalityFilter,
+                        submodality_id: submodalityFilter === "all" ? "" : submodalityFilter,
+                        category_id: categoryFilter === "all" ? "" : categoryFilter,
+                        search: searchTerm.trim()
+                      })
                     }}
                     disabled={!documentsPagination.has_next || documentsLoading}
                   >
