@@ -155,6 +155,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
   const [recalculatingQuestion, setRecalculatingQuestion] = useState<string | null>(null)
   const [expandedResponses, setExpandedResponses] = useState<Set<string>>(new Set())
   const [truncatedResponses, setTruncatedResponses] = useState<Set<string>>(new Set())
+  const truncatedRef = useRef<Map<string, boolean>>(new Map())
 
   // Estados para documentos
   const [approvingDocument, setApprovingDocument] = useState<string | null>(null)
@@ -944,25 +945,24 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                               <span className="font-medium">Respuesta Generada:</span>
                             </div>
                             <div className="relative">
-                              <div 
+                              <div
                                 ref={(el) => {
                                   if (el && !expandedResponses.has(question.question_id)) {
                                     // Detectar si está truncado después del render
                                     setTimeout(() => {
                                       const isTruncated = checkIfTruncated(el)
-                                      const newTruncated = new Set(truncatedResponses)
-                                      if (isTruncated) {
-                                        newTruncated.add(question.question_id)
-                                      } else {
-                                        newTruncated.delete(question.question_id)
+                                      const currentTruncated = truncatedRef.current.get(question.question_id) || false
+                                      if (isTruncated !== currentTruncated) {
+                                        truncatedRef.current.set(question.question_id, isTruncated)
+                                        const newSet = new Set(Array.from(truncatedRef.current.entries()).filter(([_, v]) => v).map(([k]) => k))
+                                        setTruncatedResponses(newSet)
                                       }
-                                      setTruncatedResponses(newTruncated)
                                     }, 10)
                                   }
                                 }}
                                 className={`mt-1 text-sm text-foreground/80 leading-relaxed transition-all duration-200 ${
-                                  expandedResponses.has(question.question_id) 
-                                    ? "max-h-60 overflow-y-auto" 
+                                  expandedResponses.has(question.question_id)
+                                    ? "max-h-60 overflow-y-auto"
                                     : "line-clamp-3"
                                 }`}
                                 style={{

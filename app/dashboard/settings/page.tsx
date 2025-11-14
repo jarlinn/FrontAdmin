@@ -190,7 +190,26 @@ export default function SettingsPage() {
   const loadContactConfig = async () => {
     try {
       const config = await fetchContact(`${API_CONFIG.BASE_URL}/chat/config/contact`)
-      setContactConfig(config)
+      setContactConfig({
+        office_name: config.office_name || '',
+        faculty_name: config.faculty_name || '',
+        university_name: config.university_name || '',
+        campus_location: config.campus_location || '',
+        building_name: config.building_name || '',
+        floor_office: config.floor_office || '',
+        street_address: config.street_address || '',
+        city: config.city || '',
+        state: config.state || '',
+        country: config.country || '',
+        director_name: config.director_name || '',
+        contact_phone: config.contact_phone || '',
+        contact_email: config.contact_email || '',
+        website_url: config.website_url || '',
+        office_hours: config.office_hours || '',
+        social_facebook: config.social_facebook || '',
+        social_instagram: config.social_instagram || '',
+        social_twitter: config.social_twitter || ''
+      })
     } catch (error) {
       console.error('Error loading contact config:', error)
     }
