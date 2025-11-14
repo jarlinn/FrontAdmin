@@ -116,14 +116,19 @@ const allAvailableCategories = useMemo(() => {
     return categoriesBySubmodality
   }
 
+  // If "all" is selected for submodality, show only categories directly under the modality
+  if (submodalityFilter === "all" && modalityFilter !== "all" && categoriesByModality) {
+    return categoriesByModality.filter(category => !category.submodality_id)
+  }
+
   // If a specific modality is selected but no submodality, show all categories under that modality
   if (modalityFilter !== "all" && categoriesByModality) {
     return categoriesByModality
   }
 
-  // If everything is "all", show all categories
+  // If everything is "all", show only direct categories from all modalities (consistent with content page default behavior)
   if (modalityFilter === "all" && submodalityFilter === "all" && allCategories) {
-    return allCategories
+    return allCategories.filter(category => !category.submodality_id)
   }
 
   // Default: empty array

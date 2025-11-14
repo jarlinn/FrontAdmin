@@ -971,8 +971,8 @@ export default function ContentPage() {
                         <Label>Submodalidad (Opcional)</Label>
                         <div className="flex gap-2">
                           <Select
-                            value={selectedSubmodalityId || "none"}
-                            onValueChange={(value) => setSelectedSubmodalityId(value === "none" ? "" : value)}
+                            value={selectedSubmodalityId === "none" ? "none" : (selectedSubmodalityId || "none")}
+                            onValueChange={(value) => setSelectedSubmodalityId(value === "none" ? "none" : value)}
                             disabled={!selectedModalityId}
                           >
                             <SelectTrigger className="bg-gray-100 border-gray-300 flex-1">
@@ -989,12 +989,12 @@ export default function ContentPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          {selectedSubmodalityId && (
+                          {selectedSubmodalityId && selectedSubmodalityId !== "none" && (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => setSelectedSubmodalityId("")}
+                              onClick={() => setSelectedSubmodalityId("none")}
                               className="px-2"
                             >
                               <X className="h-4 w-4" />
@@ -1448,12 +1448,12 @@ export default function ContentPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          {selectedSubmodalityId && (
+                          {selectedSubmodalityId && selectedSubmodalityId !== "none" && (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => setSelectedSubmodalityId("")}
+                              onClick={() => setSelectedSubmodalityId("none")}
                               className="px-2"
                             >
                               <X className="h-4 w-4" />
