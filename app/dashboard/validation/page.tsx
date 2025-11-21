@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -86,9 +87,12 @@ interface EditUploadedFile {
 }
 
 export default function ValidationPage() {
+  const searchParams = useSearchParams()
+
   // Estados locales
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || "all")
+  const [documentStatusFilter, setDocumentStatusFilter] = useState("all")
   const [modalityFilter, setModalityFilter] = useState("all")
   const [submodalityFilter, setSubmodalityFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
@@ -286,7 +290,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
         const filters: DocumentFilters = {}
 
         // Siempre incluir status (el backend maneja "all" como mostrar todos)
-        filters.status = statusFilter as "APPROVED" | "DISABLED" | "all"
+        filters.status = documentStatusFilter as "APPROVED" | "DISABLED" | "all"
 
         // Filtros jerárquicos
         filters.modality_id = modalityFilter === "all" ? "" : modalityFilter
@@ -304,7 +308,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
       return () => clearTimeout(timeoutId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, searchTerm, statusFilter, modalityFilter, submodalityFilter, categoryFilter])
+  }, [activeTab, searchTerm, documentStatusFilter, modalityFilter, submodalityFilter, categoryFilter])
 
 
 
@@ -1265,7 +1269,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
 
                     <div className="space-y-2">
                       <Label className="text-sm">Estado</Label>
-                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <Select value={documentStatusFilter} onValueChange={setDocumentStatusFilter}>
                         <SelectTrigger className="bg-background/50 h-10 focus:ring-blue-300 focus:ring-2">
                           <SelectValue />
                         </SelectTrigger>
@@ -1611,7 +1615,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                     size="sm"
                     onClick={() => {
                       const currentFilters: DocumentFilters = {
-                        status: statusFilter as "APPROVED" | "DISABLED" | "all",
+                        status: documentStatusFilter as "APPROVED" | "DISABLED" | "all",
                         modality_id: modalityFilter === "all" ? "" : modalityFilter,
                         submodality_id: submodalityFilter === "all" ? "" : submodalityFilter,
                         category_id: categoryFilter === "all" ? "" : categoryFilter,
@@ -1628,14 +1632,14 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                     size="sm"
                     onClick={() => {
                       const currentFilters: DocumentFilters = {
-                        status: statusFilter as "PENDING" | "APPROVED" | "DISABLED" | "all",
+                        status: documentStatusFilter as "APPROVED" | "DISABLED" | "all",
                         modality_id: modalityFilter === "all" ? "" : modalityFilter,
                         submodality_id: submodalityFilter === "all" ? "" : submodalityFilter,
                         category_id: categoryFilter === "all" ? "" : categoryFilter,
                         search: searchTerm.trim()
                       }
                       goToDocPage(documentsPagination.page + 1, {
-                        status: statusFilter as "APPROVED" | "DISABLED" | "all",
+                        status: documentStatusFilter as "APPROVED" | "DISABLED" | "all",
                         modality_id: modalityFilter === "all" ? "" : modalityFilter,
                         submodality_id: submodalityFilter === "all" ? "" : submodalityFilter,
                         category_id: categoryFilter === "all" ? "" : categoryFilter,
