@@ -20,6 +20,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import AdminLayout from "@/components/admin-layout"
+import PendingQuestionsNotification from "@/components/pending-questions-notification"
 import { API_CONFIG } from "@/lib/api-config"
 import { authService } from "@/lib/auth"
 import { Suspense } from "react"
@@ -152,6 +153,9 @@ function DashboardContent() {
             Panel de administración del chatbot universitario - Ingeniería de Sistemas
           </p>
         </div>
+
+        {/* Pending Questions Notification */}
+        <PendingQuestionsNotification />
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
