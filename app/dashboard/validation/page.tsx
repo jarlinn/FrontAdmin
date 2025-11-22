@@ -876,7 +876,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                   <Select
                     value={categoryFilter}
                     onValueChange={setCategoryFilter}
-                    disabled={allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading}
+                    disabled={modalityFilter === "all" || allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading}
                   >
                     <SelectTrigger className="bg-background/50 h-10 focus:ring-red-300 focus:ring-2">
                       <SelectValue placeholder={(allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading) ? "Cargando categorías..." : "Todas las categorías"} />
@@ -1336,7 +1336,7 @@ const [editingItem, setEditingItem] = useState<Question | null>(null)
                       <Select
                         value={categoryFilter}
                         onValueChange={setCategoryFilter}
-                        disabled={allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading}
+                        disabled={modalityFilter === "all" || allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading}
                       >
                         <SelectTrigger className="bg-background/50 h-10 focus:ring-blue-300 focus:ring-2">
                           <SelectValue placeholder={(allCategoriesLoading || categoriesBySubmodalityLoading || categoriesByModalityLoading) ? "Cargando categorías..." : "Todas las categorías"} />
