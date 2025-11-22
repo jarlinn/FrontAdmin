@@ -74,15 +74,20 @@ export default function ContentPage() {
   const [isSubmittingSubmodality, setIsSubmittingSubmodality] = useState(false)
 
   // Estados para categorías nuevas
-  const [isCreateNewCategoryOpen, setIsCreateNewCategoryOpen] = useState(false)
-  const [isEditNewCategoryOpen, setIsEditNewCategoryOpen] = useState(false)
-  const [newCategoryHierName, setNewCategoryHierName] = useState("")
-  const [newCategoryHierDescription, setNewCategoryHierDescription] = useState("")
-  const [newCategorySubmodalityId, setNewCategorySubmodalityId] = useState("")
-  const [newCategoryModalityId, setNewCategoryModalityId] = useState("")
-  const [newCategoryParentType, setNewCategoryParentType] = useState<"modality" | "submodality">("submodality")
-  const [editingNewCategory, setEditingNewCategory] = useState<NewCategory | null>(null)
-  const [isSubmittingNewCategory, setIsSubmittingNewCategory] = useState(false)
+   const [isCreateNewCategoryOpen, setIsCreateNewCategoryOpen] = useState(false)
+   const [isEditNewCategoryOpen, setIsEditNewCategoryOpen] = useState(false)
+   const [newCategoryHierName, setNewCategoryHierName] = useState("")
+   const [newCategoryHierDescription, setNewCategoryHierDescription] = useState("")
+   const [newCategorySubmodalityId, setNewCategorySubmodalityId] = useState("")
+   const [newCategoryModalityId, setNewCategoryModalityId] = useState("")
+   const [newCategoryParentType, setNewCategoryParentType] = useState<"modality" | "submodality">("submodality")
+   const [editingNewCategory, setEditingNewCategory] = useState<NewCategory | null>(null)
+   const [isSubmittingNewCategory, setIsSubmittingNewCategory] = useState(false)
+
+   // Estados para filtros en la estructura jerárquica
+   const [filterModalityId, setFilterModalityId] = useState<string>("all")
+   const [filterSubmodalityId, setFilterSubmodalityId] = useState<string>("all")
+   const [filterCategoryId, setFilterCategoryId] = useState<string>("all")
 
   // Estados para confirmaciones de eliminación
   const [isDeleteModalityOpen, setIsDeleteModalityOpen] = useState(false)
@@ -158,14 +163,53 @@ export default function ContentPage() {
   }, [selectedModalityId, selectedSubmodalityId, categoriesByModality, categoriesBySubmodality])
 
   // Clear dependent selections when parent changes
-  useEffect(() => {
-    setSelectedSubmodalityId("none")
-    setSelectedCategoryId("")
-  }, [selectedModalityId])
+   useEffect(() => {
+     setSelectedSubmodalityId("none")
+     setSelectedCategoryId("")
+   }, [selectedModalityId])
 
-  useEffect(() => {
-    setSelectedCategoryId("")
-  }, [selectedSubmodalityId])
+   useEffect(() => {
+     setSelectedCategoryId("")
+   }, [selectedSubmodalityId])
+
+   // Clear filter selections when parent filter changes
+   useEffect(() => {
+     setFilterSubmodalityId("all")
+     setFilterCategoryId("all")
+   }, [filterModalityId])
+
+   useEffect(() => {
+     setFilterCategoryId("all")
+   }, [filterSubmodalityId])
+
+   // Filtered data for hierarchy view
+   const filteredModalities = useMemo(() => {
+     if (filterModalityId === "all") return modalities || []
+     return (modalities || []).filter(modality => modality.id === filterModalityId)
+   }, [modalities, filterModalityId])
+
+   const filteredSubmodalities = useMemo(() => {
+     if (filterModalityId === "all") return submodalities || []
+     return (submodalities || []).filter(submodality => submodality.modality_id === filterModalityId)
+   }, [submodalities, filterModalityId])
+
+   const filteredCategories = useMemo(() => {
+     let categories = newCategories || []
+
+     if (filterModalityId !== "all") {
+       categories = categories.filter(cat => cat.modality_id === filterModalityId)
+     }
+
+     if (filterSubmodalityId !== "all") {
+       categories = categories.filter(cat => cat.submodality_id === filterSubmodalityId)
+     }
+
+     if (filterCategoryId !== "all") {
+       categories = categories.filter(cat => cat.id === filterCategoryId)
+     }
+
+     return categories
+   }, [newCategories, filterModalityId, filterSubmodalityId, filterCategoryId])
 
   // Funciones para manejar modalidades
   const handleCreateModality = async () => {
@@ -1662,18 +1706,173 @@ export default function ContentPage() {
               <p className="text-muted-foreground">Gestiona modalidades, submodalidades y categorías en orden ascendente</p>
             </div>
 
-            {/* Modalidades */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            {/* Filters */}
+            <Card className="bg-gray-50 border-gray-200">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  Filtros
+                </CardTitle>
+                <CardDescription>
+                  Filtra la estructura jerárquica para encontrar elementos específicos
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Modality Filter */}
+                  <div className="space-y-2">
+                    <Label>Filtrar por Modalidad</Label>
+                    <div className="flex gap-2">
+                      <Select value={filterModalityId} onValueChange={setFilterModalityId}>
+                        <SelectTrigger className="bg-white border-gray-300">
+                          <SelectValue placeholder="Todas las modalidades" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            Todas las modalidades
+                          </SelectItem>
+                          {modalities?.map((modality) => (
+                            <SelectItem key={modality.id} value={modality.id}>
+                              {modality.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {filterModalityId !== "all" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFilterModalityId("all")}
+                          className="px-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Submodality Filter */}
+                  <div className="space-y-2">
+                    <Label>Filtrar por Submodalidad</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={filterSubmodalityId}
+                        onValueChange={setFilterSubmodalityId}
+                        disabled={filterModalityId === "all"}
+                      >
+                        <SelectTrigger className="bg-white border-gray-300">
+                          <SelectValue placeholder="Todas las submodalidades" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            Todas las submodalidades
+                          </SelectItem>
+                          {filteredSubmodalities?.map((submodality) => (
+                            <SelectItem key={submodality.id} value={submodality.id}>
+                              {submodality.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {filterSubmodalityId !== "all" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFilterSubmodalityId("all")}
+                          className="px-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Category Filter */}
+                  <div className="space-y-2">
+                    <Label>Filtrar por Categoría</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={filterCategoryId}
+                        onValueChange={setFilterCategoryId}
+                        disabled={filterModalityId === "all"}
+                      >
+                        <SelectTrigger className="bg-white border-gray-300">
+                          <SelectValue placeholder="Todas las categorías" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            Todas las categorías
+                          </SelectItem>
+                          {filteredCategories?.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {filterCategoryId !== "all" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFilterCategoryId("all")}
+                          className="px-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Create Buttons */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <Layers className="h-5 w-5 text-blue-600" />
-                  <h3 className="text-lg font-semibold">Modalidades</h3>
-                  <Badge variant="secondary">{modalities?.length || 0}</Badge>
+                  <span className="text-sm font-medium">
+                    Modalidades: {filteredModalities.length} {filterModalityId !== "all" && "(filtradas)"}
+                  </span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-green-600" />
+                  <span className="text-sm font-medium">
+                    Submodalidades: {filteredSubmodalities.length} {filterModalityId !== "all" && "(filtradas)"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-purple-600" />
+                  <span className="text-sm font-medium">
+                    Categorías: {filteredCategories.length} {(filterModalityId !== "all" || filterSubmodalityId !== "all" || filterCategoryId !== "all") && "(filtradas)"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2">
                 <Button onClick={() => setIsCreateModalityOpen(true)} size="sm" className="bg-red-200 text-red-800 border-red-300 hover:bg-red-300">
                   <Plus className="h-4 w-4 mr-2" />
                   Nueva Modalidad
                 </Button>
+                <Button onClick={() => setIsCreateSubmodalityOpen(true)} size="sm" className="bg-red-200 text-red-800 border-red-300 hover:bg-red-300">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Submodalidad
+                </Button>
+                <Button onClick={() => setIsCreateNewCategoryOpen(true)} size="sm" className="bg-red-200 text-red-800 border-red-300 hover:bg-red-300">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nueva Categoría
+                </Button>
+              </div>
+            </div>
+
+            {/* Modalidades */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Layers className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold">Modalidades</h3>
+                <Badge variant="secondary">{filteredModalities.length}</Badge>
               </div>
 
               {modalitiesLoading ? (
@@ -1682,7 +1881,7 @@ export default function ContentPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {modalities?.map((modality) => (
+                  {filteredModalities.map((modality) => (
                     <Card key={modality.id} className="p-5">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -1741,16 +1940,10 @@ export default function ContentPage() {
 
             {/* Submodalidades */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Tag className="h-5 w-5 text-green-600" />
-                  <h3 className="text-lg font-semibold">Submodalidades</h3>
-                  <Badge variant="secondary">{submodalities?.length || 0}</Badge>
-                </div>
-                <Button onClick={() => setIsCreateSubmodalityOpen(true)} size="sm" className="bg-red-200 text-red-800 border-red-300 hover:bg-red-300">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nueva Submodalidad
-                </Button>
+              <div className="flex items-center gap-2">
+                <Tag className="h-5 w-5 text-green-600" />
+                <h3 className="text-lg font-semibold">Submodalidades</h3>
+                <Badge variant="secondary">{filteredSubmodalities.length}</Badge>
               </div>
 
               {submodalitiesLoading ? (
@@ -1759,7 +1952,7 @@ export default function ContentPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {submodalities?.map((submodality) => (
+                  {filteredSubmodalities.map((submodality) => (
                     <Card key={submodality.id} className="p-5">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
@@ -1819,16 +2012,10 @@ export default function ContentPage() {
 
             {/* Categorías */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-purple-600" />
-                  <h3 className="text-lg font-semibold">Categorías</h3>
-                  <Badge variant="secondary">{newCategories?.length || 0}</Badge>
-                </div>
-                <Button onClick={() => setIsCreateNewCategoryOpen(true)} size="sm" className="bg-red-200 text-red-800 border-red-300 hover:bg-red-300">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nueva Categoría
-                </Button>
+              <div className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-purple-600" />
+                <h3 className="text-lg font-semibold">Categorías</h3>
+                <Badge variant="secondary">{filteredCategories.length}</Badge>
               </div>
 
               {newCategoriesLoading ? (
@@ -1837,7 +2024,7 @@ export default function ContentPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {newCategories?.map((category: NewCategory) => (
+                  {filteredCategories.map((category: NewCategory) => (
                     <Card key={category.id} className="p-5">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
