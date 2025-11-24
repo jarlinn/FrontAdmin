@@ -13,6 +13,9 @@ import SubmodalityDistributionPieChart from "@/components/submodality-distributi
 import CategoryDistributionTable from "@/components/category-distribution-table"
 import CategoryDistributionVerticalChart from "@/components/category-distribution-vertical-chart"
 import CategoryDistributionPieChart from "@/components/category-distribution-pie-chart"
+import SimilarityScoreDistributionTable from "@/components/similarity-score-distribution-table"
+import SimilarityScoreDistributionVerticalChart from "@/components/similarity-score-distribution-vertical-chart"
+import SimilarityScoreDistributionPieChart from "@/components/similarity-score-distribution-pie-chart"
 import ExportControls from "@/components/export-controls"
 import ReportGenerator from "@/components/report-generator"
 import { useFrequentQuestions } from "@/hooks/use-frequent-questions"
@@ -158,6 +161,40 @@ export default function MetricsPage() {
 
             <TabsContent value="category-pie" className="mt-6">
               <CategoryDistributionPieChart />
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Sección de Distribución por Similarity Score */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-6">Distribución por Similarity Score</h2>
+
+          <Tabs defaultValue="similarity-table" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="similarity-table" className="flex items-center gap-2">
+                <Table className="h-4 w-4" />
+                Tabla
+              </TabsTrigger>
+              <TabsTrigger value="similarity-vertical-bar" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Barras Verticales
+              </TabsTrigger>
+              <TabsTrigger value="similarity-pie" className="flex items-center gap-2">
+                <PieChart className="h-4 w-4" />
+                Distribución
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="similarity-table" className="mt-6">
+              <SimilarityScoreDistributionTable />
+            </TabsContent>
+
+            <TabsContent value="similarity-vertical-bar" className="mt-6">
+              <SimilarityScoreDistributionVerticalChart />
+            </TabsContent>
+
+            <TabsContent value="similarity-pie" className="mt-6">
+              <SimilarityScoreDistributionPieChart />
             </TabsContent>
           </Tabs>
         </div>

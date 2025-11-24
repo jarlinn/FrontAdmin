@@ -22,6 +22,13 @@ export interface CategoryDistributionMetric {
   count: number
 }
 
+export interface SimilarityScoreDistributionMetric {
+  range: string
+  count: number
+  minScore: number
+  maxScore: number
+}
+
 
 export interface PrometheusQueryResponse {
   status: string
@@ -34,6 +41,7 @@ export interface PrometheusQueryResponse {
         modality?: string
         submodality?: string
         category?: string
+        similarity_score?: string
       }
       value?: [number, string] // For instant query
       values?: Array<[number, string]> // For range query
@@ -280,6 +288,77 @@ class MetricsService {
       })
 
       const result = Object.values(grouped).sort((a, b) => b.count - a.count)
+
+      return result
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error
+      }
+      throw new Error('Error de conexión a Prometheus')
+    }
+  }
+
+  /**
+     * Obtener la distribución por similarity_score
+     */
+  async getSimilarityScoreDistribution(): Promise<SimilarityScoreDistributionMetric[]> {
+    try {
+      // Query range for historical data
+      const query = encodeURIComponent('frequent_questions_total')
+      const end = Math.floor(Date.now() / 1000)
+      const start = end - (15 * 24 * 3600) // 15 days ago
+      const step = 120 // 1 hour
+      const url = `${PROMETHEUS_BASE_URL}/api/v1/query_range?query=${query}&start=${start}&end=${end}&step=${step}`
+
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Error al consultar Prometheus: ${response.status}`)
+      }
+
+      const data: PrometheusQueryResponse = await response.json()
+
+      if (data.status !== 'success') {
+        throw new Error(`Error en la respuesta de Prometheus: ${data.error || 'Respuesta no exitosa'}`)
+      }
+
+      if (!data.data) {
+        throw new Error('No se recibió data en la respuesta de Prometheus')
+      }
+
+      // Group by similarity_score ranges
+      const ranges = [
+        { label: '0.0 - 0.2', min: 0.0, max: 0.2 },
+        { label: '0.2 - 0.4', min: 0.2, max: 0.4 },
+        { label: '0.4 - 0.6', min: 0.4, max: 0.6 },
+        { label: '0.6 - 0.8', min: 0.6, max: 0.8 },
+        { label: '0.8 - 1.0', min: 0.8, max: 1.0 }
+      ]
+
+      const grouped: { [key: string]: SimilarityScoreDistributionMetric } = {}
+
+      ranges.forEach(range => {
+        grouped[range.label] = {
+          range: range.label,
+          count: 0,
+          minScore: range.min,
+          maxScore: range.max
+        }
+      })
+
+      data.data.result.forEach(item => {
+        const similarityScore = parseFloat(item.metric.similarity_score || '0')
+        const range = ranges.find(r => similarityScore >= r.min && similarityScore < r.max)
+        if (range) {
+          grouped[range.label].count += parseFloat(item.values ? item.values[item.values.length - 1][1] : '0')
+        }
+      })
+
+      const result = Object.values(grouped).filter(item => item.count > 0)
 
       return result
     } catch (error) {
