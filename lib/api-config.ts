@@ -32,6 +32,7 @@ export const API_CONFIG = {
     QUESTIONS_NO_SLASH: '/chat/questions',
     DOCUMENTS: '/chat/documents',
     CATEGORIES: '/chat/categories/',
+    REPORTS_FREQUENT_QUESTIONS_DOWNLOAD: '/chat/reports/frequent-questions/download',
   },
   
   // Configuración de timeout (en milisegundos)
