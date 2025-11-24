@@ -1,6 +1,6 @@
 "use client"
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, Cell } from 'recharts'
 import { useCategoryDistribution } from '@/hooks/use-category-distribution'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -9,6 +9,8 @@ interface CategoryDistributionVerticalChartProps {
   title?: string
   height?: number
 }
+
+const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#ca8a04', '#7c3aed', '#c2410c', '#0891b2', '#be185d']
 
 export default function CategoryDistributionVerticalChart({
   title = "Distribución por Categoría - Barras Verticales",
@@ -126,11 +128,14 @@ export default function CategoryDistributionVerticalChart({
               fontSize={12}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="count" fill="#2563eb" radius={[4, 4, 0, 0]}>
+            <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
               <LabelList
                 dataKey="count"
                 position="top"
-                style={{ fill: '#2563eb', fontSize: '12px', fontWeight: 'bold' }}
+                style={{ fill: '#374151', fontSize: '12px', fontWeight: 'bold' }}
               />
             </Bar>
           </BarChart>
