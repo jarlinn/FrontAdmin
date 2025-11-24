@@ -10,6 +10,9 @@ import ModalityDistributionPieChart from "@/components/modality-distribution-pie
 import SubmodalityDistributionTable from "@/components/submodality-distribution-table"
 import SubmodalityDistributionVerticalChart from "@/components/submodality-distribution-vertical-chart"
 import SubmodalityDistributionPieChart from "@/components/submodality-distribution-pie-chart"
+import CategoryDistributionTable from "@/components/category-distribution-table"
+import CategoryDistributionVerticalChart from "@/components/category-distribution-vertical-chart"
+import CategoryDistributionPieChart from "@/components/category-distribution-pie-chart"
 import ExportControls from "@/components/export-controls"
 import ReportGenerator from "@/components/report-generator"
 import { useFrequentQuestions } from "@/hooks/use-frequent-questions"
@@ -121,6 +124,40 @@ export default function MetricsPage() {
 
             <TabsContent value="submodality-pie" className="mt-6">
               <SubmodalityDistributionPieChart />
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Sección de Distribución por Categoría */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-6">Distribución por Categoría</h2>
+
+          <Tabs defaultValue="category-table" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="category-table" className="flex items-center gap-2">
+                <Table className="h-4 w-4" />
+                Tabla
+              </TabsTrigger>
+              <TabsTrigger value="category-vertical-bar" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Barras Verticales
+              </TabsTrigger>
+              <TabsTrigger value="category-pie" className="flex items-center gap-2">
+                <PieChart className="h-4 w-4" />
+                Distribución
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="category-table" className="mt-6">
+              <CategoryDistributionTable />
+            </TabsContent>
+
+            <TabsContent value="category-vertical-bar" className="mt-6">
+              <CategoryDistributionVerticalChart />
+            </TabsContent>
+
+            <TabsContent value="category-pie" className="mt-6">
+              <CategoryDistributionPieChart />
             </TabsContent>
           </Tabs>
         </div>
