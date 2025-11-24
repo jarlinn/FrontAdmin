@@ -7,6 +7,9 @@ import FrequentQuestionsVerticalChart from "@/components/frequent-questions-vert
 import ModalityDistributionTable from "@/components/modality-distribution-table"
 import ModalityDistributionVerticalChart from "@/components/modality-distribution-vertical-chart"
 import ModalityDistributionPieChart from "@/components/modality-distribution-pie-chart"
+import SubmodalityDistributionTable from "@/components/submodality-distribution-table"
+import SubmodalityDistributionVerticalChart from "@/components/submodality-distribution-vertical-chart"
+import SubmodalityDistributionPieChart from "@/components/submodality-distribution-pie-chart"
 import ExportControls from "@/components/export-controls"
 import ReportGenerator from "@/components/report-generator"
 import { useFrequentQuestions } from "@/hooks/use-frequent-questions"
@@ -84,6 +87,40 @@ export default function MetricsPage() {
 
             <TabsContent value="modality-pie" className="mt-6">
               <ModalityDistributionPieChart />
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Sección de Distribución por Submodalidad */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-6">Distribución por Submodalidad</h2>
+
+          <Tabs defaultValue="submodality-table" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="submodality-table" className="flex items-center gap-2">
+                <Table className="h-4 w-4" />
+                Tabla
+              </TabsTrigger>
+              <TabsTrigger value="submodality-vertical-bar" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Barras Verticales
+              </TabsTrigger>
+              <TabsTrigger value="submodality-pie" className="flex items-center gap-2">
+                <PieChart className="h-4 w-4" />
+                Distribución
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="submodality-table" className="mt-6">
+              <SubmodalityDistributionTable />
+            </TabsContent>
+
+            <TabsContent value="submodality-vertical-bar" className="mt-6">
+              <SubmodalityDistributionVerticalChart />
+            </TabsContent>
+
+            <TabsContent value="submodality-pie" className="mt-6">
+              <SubmodalityDistributionPieChart />
             </TabsContent>
           </Tabs>
         </div>
