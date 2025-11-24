@@ -4,6 +4,9 @@ import AdminLayout from "@/components/admin-layout"
 import FrequentQuestionsTable from "@/components/frequent-questions-table"
 import FrequentQuestionsPieChart from "@/components/frequent-questions-pie-chart"
 import FrequentQuestionsVerticalChart from "@/components/frequent-questions-vertical-chart"
+import ModalityDistributionTable from "@/components/modality-distribution-table"
+import ModalityDistributionVerticalChart from "@/components/modality-distribution-vertical-chart"
+import ModalityDistributionPieChart from "@/components/modality-distribution-pie-chart"
 import ExportControls from "@/components/export-controls"
 import ReportGenerator from "@/components/report-generator"
 import { useFrequentQuestions } from "@/hooks/use-frequent-questions"
@@ -50,6 +53,40 @@ export default function MetricsPage() {
             <FrequentQuestionsPieChart />
           </TabsContent>
         </Tabs>
+
+        {/* Sección de Distribución por Modalidad */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-6">Distribución por Modalidad</h2>
+
+          <Tabs defaultValue="modality-table" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="modality-table" className="flex items-center gap-2">
+                <Table className="h-4 w-4" />
+                Tabla
+              </TabsTrigger>
+              <TabsTrigger value="modality-vertical-bar" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Barras Verticales
+              </TabsTrigger>
+              <TabsTrigger value="modality-pie" className="flex items-center gap-2">
+                <PieChart className="h-4 w-4" />
+                Distribución
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="modality-table" className="mt-6">
+              <ModalityDistributionTable />
+            </TabsContent>
+
+            <TabsContent value="modality-vertical-bar" className="mt-6">
+              <ModalityDistributionVerticalChart />
+            </TabsContent>
+
+            <TabsContent value="modality-pie" className="mt-6">
+              <ModalityDistributionPieChart />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </AdminLayout>
   )
