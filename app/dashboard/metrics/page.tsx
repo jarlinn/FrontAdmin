@@ -17,9 +17,38 @@ import SimilarityScoreDistributionTable from "@/components/similarity-score-dist
 import SimilarityScoreDistributionVerticalChart from "@/components/similarity-score-distribution-vertical-chart"
 import SimilarityScoreDistributionPieChart from "@/components/similarity-score-distribution-pie-chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BarChart3, PieChart, Table } from "lucide-react"
+import { BarChart3, PieChart, Table, Download, RefreshCw } from "lucide-react"
+import { useAuthFetch } from "@/hooks/use-auth-fetch"
+import { useToast } from "@/components/ui/use-toast"
+import { Button } from "@/components/ui/button"
+import { API_CONFIG } from "@/lib/api-config"
 
 export default function MetricsPage() {
+  const { fetchData, loading: downloadLoading, error: downloadError } = useAuthFetch()
+  const { toast } = useToast()
+
+  const handleDownloadReport = async () => {
+    try {
+      const response = await fetchData(`${API_CONFIG.BASE_URL}/chat/reports/frequent-questions/download`, {
+        method: 'POST'
+      })
+      if (response.status === 'success') {
+        // Open in new tab
+        window.open(response.download_url, '_blank')
+        toast({
+          title: "Reporte abierto",
+          description: "El reporte se ha abierto en una nueva pestaña.",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error en la descarga",
+        description: downloadError || "No se pudo descargar el reporte.",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -187,6 +216,31 @@ export default function MetricsPage() {
               <SimilarityScoreDistributionPieChart />
             </TabsContent>
           </Tabs>
+        </div>
+
+        {/* Sección de Reportes */}
+        <div className="mt-8">
+          <h2 className="text-2xl font-bold mb-6">Reportes</h2>
+          <div className="bg-card p-6 rounded-lg border">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Reporte de Preguntas Más Solicitadas</h3>
+                <p className="text-muted-foreground">Reporte quincenal con las preguntas más frecuentes del sistema</p>
+              </div>
+              <Button
+                onClick={handleDownloadReport}
+                disabled={downloadLoading}
+                className="flex items-center space-x-2"
+              >
+                {downloadLoading ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+                <span>{downloadLoading ? "Generando..." : "Descargar"}</span>
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </AdminLayout>

@@ -6,17 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  MessageSquare,
-  Users,
-  Clock,
   FileText,
   CheckCircle,
   BarChart3,
   Upload,
   Brain,
   ArrowRight,
-  TrendingUp,
-  AlertCircle,
 } from "lucide-react"
 import Link from "next/link"
 import AdminLayout from "@/components/admin-layout"
@@ -25,40 +20,6 @@ import { API_CONFIG } from "@/lib/api-config"
 import { authService } from "@/lib/auth"
 import { Suspense } from "react"
 
-const stats = [
-  {
-    title: "Preguntas Configuradas",
-    value: "0",
-    change: "+0%",
-    changeType: "positive" as const,
-    icon: MessageSquare,
-    description: "Total de preguntas en la base de conocimiento",
-  },
-  {
-    title: "Pendientes de Revisión",
-    value: "0",
-    change: "+0%",
-    changeType: "positive" as const,
-    icon: AlertCircle,
-    description: "Respuestas generadas por IA esperando validación",
-  },
-  {
-    title: "Usuarios Activos",
-    value: "0",
-    change: "+0%",
-    changeType: "positive" as const,
-    icon: Users,
-    description: "Usuarios que interactuaron en el último mes",
-  },
-  {
-    title: "Tiempo Promedio",
-    value: "0s",
-    change: "+0%",
-    changeType: "positive" as const,
-    icon: Clock,
-    description: "Tiempo promedio de respuesta del chatbot",
-  },
-]
 
 const howItWorksSteps = [
   {
@@ -99,13 +60,13 @@ const quickActions = [
     icon: CheckCircle,
     color: "bg-red-600 hover:bg-red-700",
   },
-  // {
-  //   title: "Ver Estadísticas",
-  //   description: "Analizar el rendimiento del chatbot",
-  //   href: "/dashboard/statistics",
-  //   icon: BarChart3,
-  //   color: "bg-red-600 hover:bg-red-700",
-  // }
+  {
+    title: "Ver Métricas",
+    description: "Analizar métricas y descargar reportes",
+    href: "/dashboard/metrics",
+    icon: BarChart3,
+    color: "bg-red-600 hover:bg-red-700",
+  },
 ]
 
 function DashboardContent() {
@@ -156,31 +117,6 @@ function DashboardContent() {
 
         {/* Pending Questions Notification */}
         <PendingQuestionsNotification />
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, index) => (
-            <Card
-              key={index}
-              className="bg-white border-gray-200 hover:bg-gray-50 transition-colors shadow-md"
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">{stat.title}</CardTitle>
-                <stat.icon className="h-4 w-4 text-gray-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-black">{stat.value}</div>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant={stat.changeType === "positive" ? "default" : "destructive"} className="text-xs bg-gray-100 text-gray-800 border-gray-300">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    {stat.change}
-                  </Badge>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">{stat.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
 
         {/* How It Works Section */}
         <Card className="bg-white border-gray-200 shadow-md">
