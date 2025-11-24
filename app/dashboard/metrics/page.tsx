@@ -16,24 +16,14 @@ import CategoryDistributionPieChart from "@/components/category-distribution-pie
 import SimilarityScoreDistributionTable from "@/components/similarity-score-distribution-table"
 import SimilarityScoreDistributionVerticalChart from "@/components/similarity-score-distribution-vertical-chart"
 import SimilarityScoreDistributionPieChart from "@/components/similarity-score-distribution-pie-chart"
-import ExportControls from "@/components/export-controls"
-import ReportGenerator from "@/components/report-generator"
-import { useFrequentQuestions } from "@/hooks/use-frequent-questions"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarChart3, PieChart, Table } from "lucide-react"
 
 export default function MetricsPage() {
-  const { data } = useFrequentQuestions()
-
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <ExportControls
-          data={data}
-          title="preguntas-frecuentes"
-        />
-        <ReportGenerator />
-
+        <h2 className="text-2xl font-bold mb-6">Distribución por Preguntas</h2>
         <Tabs defaultValue="table" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="table" className="flex items-center gap-2">
